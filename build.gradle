@@ -1,0 +1,25 @@
+plugins {
+    id 'application'
+}
+
+version '0.5-ALPHA'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.0'
+    implementation group: 'com.ibm.mq', name: 'com.ibm.mq.allclient', version: '9.2.0.3'
+    implementation group: 'javax.jms', name: 'javax.jms-api', version: '2.0.1'
+    implementation group: 'org.apache.commons', name: 'commons-text', version: '1.9'
+}
+
+application {
+    mainClass = "task.Main"
+}
+
+test {
+    useJUnitPlatform()
+}

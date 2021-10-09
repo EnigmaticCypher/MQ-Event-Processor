@@ -29,6 +29,7 @@ public class Main {
     private static final String QUEUE_NAME = "SYSTEM.ADMIN.COMMAND.EVENT"; // Queue that the application uses to put and get messages to and from
     private static final String OUTPUT_QUEUE_NAME = "EVENT.OUTPUT.JSON";
     private static final boolean DEBUG = true;
+    private static volatile boolean SHUTDOWN = false;
 
     private static final Map<Integer, String> openOptions = new LinkedHashMap<>() {{
         put(MQConstants.MQOO_ALTERNATE_USER_AUTHORITY, "altusr");
@@ -87,7 +88,8 @@ public class Main {
     }};
 
     public static void main(String[] args) {
-        // Kick off the whole show.
+        // Add SIGTERM handling
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> SHUTDOWN = true));
         Main main = new Main();
         main.initialise();
     }
@@ -139,9 +141,6 @@ public class Main {
                 session.close();
                 connection.close();
             } else {
-                // TODO: Make this application gracefully handle SIGTERM from Linux when not in debug mode.
-                // We can't currently close the objects we've opened due to the infinite loop. Handling SIGTERM
-                // will *hopefully* help with that.
                 connection = connectionFactory.createConnection();
                 session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
                 inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
@@ -149,7 +148,7 @@ public class Main {
                 producer = session.createProducer(outputQueue);
                 consumer = session.createConsumer(inputQueue);
 
-                while (true) {
+                while (!SHUTDOWN) {
                     Message message = consumer.receive();
 
                     if (message == null) {
@@ -165,10 +164,10 @@ public class Main {
                     session.commit();
                 }
 
-                // producer.close();
-                // consumer.close();
-                // session.close();
-                // connection.close();
+                producer.close();
+                consumer.close();
+                session.close();
+                connection.close();
             }
 
             long endTime = System.currentTimeMillis();

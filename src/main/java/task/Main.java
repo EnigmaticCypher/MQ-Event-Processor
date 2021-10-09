@@ -110,10 +110,10 @@ public class Main {
             MessageConsumer consumer;
             JmsConnectionFactory connectionFactory = setupConnectionFactory();
 
-            long startTime = System.currentTimeMillis();
-            int counter = 0;
-
             if (DEBUG) {
+                long startTime = System.currentTimeMillis();
+                int counter = 0;
+
                 connection = connectionFactory.createConnection();
                 session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
                 inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
@@ -140,6 +140,10 @@ public class Main {
                 producer.close();
                 session.close();
                 connection.close();
+
+                long endTime = System.currentTimeMillis();
+                long totalTime = endTime - startTime;
+                System.out.printf("We processed %d messages in %d milliseconds", counter, totalTime);
             } else {
                 connection = connectionFactory.createConnection();
                 session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
@@ -169,11 +173,6 @@ public class Main {
                 session.close();
                 connection.close();
             }
-
-            long endTime = System.currentTimeMillis();
-            long totalTime = endTime - startTime;
-            System.out.printf("We processed %d messages in %d milliseconds", counter, totalTime);
-
         } catch (JMSException | IOException | MQDataException | JSONException exception) {
             exception.printStackTrace();
         }

@@ -535,7 +535,7 @@ public class Main {
                     // Bug in some z/OS versions - ported from amqsevt
                     parameter.setIntValue(-3);
                 }
-                // Need manual handling because of MQMON_OFF/MQMON_DISABLED crap.
+                // Need manual handling because of MQMON_OFF/MQMON_DISABLED being the same value.
                 valueName = MQConstants.lookup(parameter.getIntValue(), "MQMON_.*");
                 if (valueName.contains("MQMON_DISABLED")) {
                     valueName = "MQMON_OFF";
@@ -764,7 +764,7 @@ public class Main {
             case MQConstants.MQIA_PLATFORM:
                 parameterValue = parameter.getIntValue();
                 // AIX is a variant of UNIX. AIX constant string does not exist
-                // in C constants so we ignore it and mark as UNIX to be consistent with C.
+                // in C constants, so we ignore it and mark as UNIX to be consistent with C.
                 if (parameterValue == 3) {
                     valueName = "MQPL_UNIX";
                     // Same thing with MVS / OS390. These are old names for ZOS, and they don't

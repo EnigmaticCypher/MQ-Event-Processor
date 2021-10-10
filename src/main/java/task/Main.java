@@ -569,8 +569,8 @@ public class Main {
                                     parameter.getIntValue()));
                 }
                 // Further bugfix because even after manual handling, there are *still* inconsistencies in the MQIA
-                // constants. Seriously IBM, you guys really need to learn how to make constants that are actually
-                // individually *constant* instead of overlapping all over the joint.
+                // constants. Fix this to make things properly consistent. Note that this manual override will cause
+                // problems if a user attempts to consume messages published from the $SYS/MQ topics.
                 if (parameterName.contains("MQIA_FIRST")) {
                     parameterName = "MQIA_APPL_TYPE";
                 }
@@ -763,7 +763,7 @@ public class Main {
                 break;
             case MQConstants.MQIA_PLATFORM:
                 parameterValue = parameter.getIntValue();
-                // Wtf IBM, AIX is a variant of UNIX. AIX constant string does not exist
+                // AIX is a variant of UNIX. AIX constant string does not exist
                 // in C constants so we ignore it and mark as UNIX to be consistent with C.
                 if (parameterValue == 3) {
                     valueName = "MQPL_UNIX";

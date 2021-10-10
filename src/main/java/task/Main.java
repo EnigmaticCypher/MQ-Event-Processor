@@ -105,86 +105,102 @@ public class Main {
         try {
             // TODO: Maybe make this application process messages in batches? This allows for more efficient MQCMIT
             // Which therefore means we should get better performance.
-            Connection connection;
-            Session session;
-            Queue inputQueue;
-            Queue outputQueue;
-            QueueBrowser browser;
-            Enumeration<Message> messages;
-            MessageProducer producer;
-            MessageConsumer consumer;
-            JmsConnectionFactory connectionFactory = setupConnectionFactory();
-
             if (DEBUG) {
-                long startTime = System.currentTimeMillis();
-                int counter = 0;
-
-                connection = connectionFactory.createConnection();
-                connection.start();
-                session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-                inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
-                outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
-                browser = session.createBrowser(inputQueue);
-                messages = (Enumeration<Message>) browser.getEnumeration();
-                producer = session.createProducer(outputQueue);
-
-                while(messages.hasMoreElements()) {
-                    Message message = messages.nextElement();
-                    JSONObject jsonMessage = processMessage(message);
-
-                    // System.out.println(jsonMessage.toString(4));
-                    TextMessage outputMessage = session.createTextMessage(jsonMessage.toString());
-                    producer.send(outputMessage);
-                    counter += 1;
-
-                    if (counter % 100 == 0) {
-                        session.commit();
-                    }
-                }
-                // Commit remaining batch before shutting down.
-                session.commit();
-
-                browser.close();
-                producer.close();
-                session.close();
-                connection.close();
-
-                long endTime = System.currentTimeMillis();
-                long totalTime = endTime - startTime;
-                System.out.printf("We processed %d messages in %d milliseconds", counter, totalTime);
+                startupDebugMode();
             } else {
-                connection = connectionFactory.createConnection();
-                connection.start();
-                session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-                inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
-                outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
-                producer = session.createProducer(outputQueue);
-                consumer = session.createConsumer(inputQueue);
-
-                while (!SHUTDOWN) {
-                    Message message = consumer.receive();
-
-                    if (message == null) {
-                        throw new IllegalStateException("Message consumer is closed!");
-                    }
-
-                    JSONObject jsonMessage = processMessage(message);
-                    TextMessage outputMessage = session.createTextMessage(jsonMessage.toString());
-                    producer.send(outputMessage);
-                    // We commit for every message at the moment, less performant but there are plans to add the
-                    // capability to handle batching. Needs to be configurable by the user, because the amount of
-                    // load will determine the need for batched commits or not.
-                    session.commit();
-                }
-
-                producer.close();
-                consumer.close();
-                session.close();
-                connection.close();
+                startupProductionMode();
             }
         } catch (JMSException | IOException | MQDataException | JSONException exception) {
+            // TODO: Update this to use Log4J handling.
             exception.printStackTrace();
         }
+    }
+
+    private void startupDebugMode() throws JMSException, JSONException, IOException, MQDataException {
+        Connection connection;
+        Session session;
+        Queue inputQueue;
+        Queue outputQueue;
+        QueueBrowser browser;
+        Enumeration<Message> messages;
+        MessageProducer producer;
+        JmsConnectionFactory connectionFactory = setupConnectionFactory();
+
+        long startTime = System.currentTimeMillis();
+        int counter = 0;
+
+        connection = connectionFactory.createConnection();
+        connection.start();
+        session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+        inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
+        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
+        browser = session.createBrowser(inputQueue);
+        messages = (Enumeration<Message>) browser.getEnumeration();
+        producer = session.createProducer(outputQueue);
+
+        while(messages.hasMoreElements()) {
+            Message message = messages.nextElement();
+            JSONObject jsonMessage = processMessage(message);
+
+            // System.out.println(jsonMessage.toString(4));
+            TextMessage outputMessage = session.createTextMessage(jsonMessage.toString());
+            producer.send(outputMessage);
+            counter += 1;
+
+            if (counter % 100 == 0) {
+                session.commit();
+            }
+        }
+        // Commit remaining batch before shutting down.
+        session.commit();
+
+        browser.close();
+        producer.close();
+        session.close();
+        connection.close();
+
+        long endTime = System.currentTimeMillis();
+        long totalTime = endTime - startTime;
+        System.out.printf("We processed %d messages in %d milliseconds", counter, totalTime);
+    }
+
+    private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {
+        Connection connection;
+        Session session;
+        Queue inputQueue;
+        Queue outputQueue;
+        MessageProducer producer;
+        MessageConsumer consumer;
+        JmsConnectionFactory connectionFactory = setupConnectionFactory();
+
+        connection = connectionFactory.createConnection();
+        connection.start();
+        session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+        inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
+        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
+        producer = session.createProducer(outputQueue);
+        consumer = session.createConsumer(inputQueue);
+
+        while (!SHUTDOWN) {
+            Message message = consumer.receive();
+
+            if (message == null) {
+                throw new IllegalStateException("Message consumer is closed!");
+            }
+
+            JSONObject jsonMessage = processMessage(message);
+            TextMessage outputMessage = session.createTextMessage(jsonMessage.toString());
+            producer.send(outputMessage);
+            // We commit for every message at the moment, less performant but there are plans to add the
+            // capability to handle batching. Needs to be configurable by the user, because the amount of
+            // load will determine the need for batched commits or not.
+            session.commit();
+        }
+
+        producer.close();
+        consumer.close();
+        session.close();
+        connection.close();
     }
 
     private JmsConnectionFactory setupConnectionFactory() throws JMSException {

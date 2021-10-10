@@ -137,6 +137,8 @@ public class Main {
                         session.commit();
                     }
                 }
+                // Commit remaining batch before shutting down.
+                session.commit();
 
                 browser.close();
                 producer.close();

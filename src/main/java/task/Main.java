@@ -24,7 +24,7 @@ import java.util.*;
 public class Main {
     // Create variables for the connection to MQ
     // TODO: Implement properties file for this data, rather than hard coding it in the dev environment.
-    private static final String HOST = "192.168.112.129"; // Host name or IP address
+    private static final String HOST = "192.168.112.132"; // Host name or IP address
     private static final int PORT = 1414; // Listener port for your queue manager
     private static final String CHANNEL = "CYPHER"; // Channel name
     private static final String QMGR = "TST1"; // Queue manager name

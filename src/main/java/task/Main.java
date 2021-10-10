@@ -28,9 +28,9 @@ public class Main {
     private static final int PORT = 1414; // Listener port for your queue manager
     private static final String CHANNEL = "CYPHER"; // Channel name
     private static final String QMGR = "TST1"; // Queue manager name
-    private static final String QUEUE_NAME = "SYSTEM.ADMIN.COMMAND.EVENT"; // Queue that the application uses to put and get messages to and from
+    private static final String QUEUE_NAME = "EVENTS.PROD.TEST"; // Queue that the application uses to put and get messages to and from
     private static final String OUTPUT_QUEUE_NAME = "EVENT.OUTPUT.JSON";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
     private static volatile boolean SHUTDOWN = false;
 
     private static final Map<Integer, String> openOptions = new LinkedHashMap<>() {{
@@ -91,7 +91,10 @@ public class Main {
 
     public static void main(String[] args) {
         // Add SIGTERM handling
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> SHUTDOWN = true));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Received shutdown signal, shutting down");
+            SHUTDOWN = true;
+        }));
         Main main = new Main();
         main.initialise();
     }
@@ -117,6 +120,7 @@ public class Main {
                 int counter = 0;
 
                 connection = connectionFactory.createConnection();
+                connection.start();
                 session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
                 inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
                 outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
@@ -150,6 +154,7 @@ public class Main {
                 System.out.printf("We processed %d messages in %d milliseconds", counter, totalTime);
             } else {
                 connection = connectionFactory.createConnection();
+                connection.start();
                 session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
                 inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
                 outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);

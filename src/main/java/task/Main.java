@@ -14,9 +14,7 @@ import org.json.JSONObject;
 
 import javax.jms.Queue;
 import javax.jms.*;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.IllegalStateException;
 import java.time.Instant;
@@ -159,42 +157,61 @@ public class Main {
         long startTime = System.currentTimeMillis();
         int counter = 0;
 
+        logger.info("System running in debug mode! Messages will not be destructively consumed from the input queue.");
         connection = connectionFactory.createConnection();
         connection.start();
+        logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
         session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
         inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
         browser = session.createBrowser(inputQueue);
+        logger.info("Created browser to queue {}", INPUT_QUEUE_NAME);
         messages = (Enumeration<Message>) browser.getEnumeration();
         producer = session.createProducer(outputQueue);
+        logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);
 
+        logger.info("Beginning message processing...");
         while(messages.hasMoreElements()) {
             Message message = messages.nextElement();
             JSONObject jsonMessage = processMessage(message);
 
-            // System.out.println(jsonMessage.toString(4));
+            // If message is null, this means it failed basic sanity checks or otherwise was unable to be
+            // processed at all. Backout this message if we encounter this scenario.
+            if (jsonMessage == null) {
+                session.rollback();
+                logger.error("Backed out current transaction!");
+                continue;
+            }
+
             TextMessage outputMessage = session.createTextMessage(jsonMessage.toString());
             producer.send(outputMessage);
             counter += 1;
 
             if (counter % 100 == 0) {
                 session.commit();
+                logger.debug("Committed current transaction");
             }
         }
         // Commit remaining batch before shutting down.
         session.commit();
 
         browser.close();
+        logger.info("Successfully closed browser to queue {}", INPUT_QUEUE_NAME);
         producer.close();
+        logger.info("Successfully closed producer to queue {}", OUTPUT_QUEUE_NAME);
         session.close();
+        logger.info("Successfully closed session to queue manager {}", QMGR);
         connection.close();
+        logger.info("Successfully closed connection to queue manager {} on {}({})", QMGR, HOST, PORT);
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
-        logger.info("We processed %d messages in %d milliseconds", counter, totalTime);
+        logger.info("We processed {} messages in {} milliseconds", counter, totalTime);
     }
 
     private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {
+        // TODO: Make transacted a config option. Users may not want syncpoint enabled if they want to use this
+        // with non-persistent event messages.
         Connection connection;
         Session session;
         Queue inputQueue;
@@ -205,32 +222,49 @@ public class Main {
 
         connection = connectionFactory.createConnection();
         connection.start();
+        logger.debug("Created and started connection");
         session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
         inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
         producer = session.createProducer(outputQueue);
+        logger.debug("Created producer to queue {}", OUTPUT_QUEUE_NAME);
         consumer = session.createConsumer(inputQueue);
+        logger.debug("Created consumer to queue {}", INPUT_QUEUE_NAME);
 
         while (!SHUTDOWN) {
             Message message = consumer.receive();
+            logger.debug("Received new message, started new transaction");
 
             if (message == null) {
                 throw new IllegalStateException("Message consumer is closed!");
             }
 
             JSONObject jsonMessage = processMessage(message);
+            // If message is null, this means it failed basic sanity checks or otherwise was unable to be
+            // processed at all. Backout this message if we encounter this scenario.
+            if (jsonMessage == null) {
+                session.rollback();
+                logger.error("Backed out current transaction!");
+                continue;
+            }
+
             TextMessage outputMessage = session.createTextMessage(jsonMessage.toString());
             producer.send(outputMessage);
             // We commit for every message at the moment, less performant but there are plans to add the
             // capability to handle batching. Needs to be configurable by the user, because the amount of
             // load will determine the need for batched commits or not.
             session.commit();
+            logger.debug("Committed current transaction");
         }
 
         producer.close();
+        logger.info("Successfully closed producer to queue {}", OUTPUT_QUEUE_NAME);
         consumer.close();
+        logger.info("Successfully closed consumer to queue {}", INPUT_QUEUE_NAME);
         session.close();
+        logger.info("Successfully closed session to queue manager {}", QMGR);
         connection.close();
+        logger.info("Successfully closed connection to queue manager {} on {}({})", QMGR, HOST, PORT);
     }
 
     private JmsConnectionFactory setupConnectionFactory() throws JMSException {
@@ -251,7 +285,8 @@ public class Main {
         MQMessage mqMessage = convertToMQMessage(receivedMessage);
 
         if (!checkMessageSanity(mqMessage)) {
-            System.out.println("Message failed basic sanity checks!");
+            logger.error("Message failed basic sanity checks!");
+            return null;
         }
 
         PCFMessage pcfMessage = new PCFMessage(mqMessage);
@@ -344,19 +379,19 @@ public class Main {
             case MQConstants.MQFMT_ADMIN:
                 break;
             default:
-                System.out.println("Message is not a recognised event format");
-                System.out.println(mqMessage.format);
+                logger.error("Message is not a recognised event format");
+                logger.error(mqMessage.format);
                 return false;
         }
 
         if (mqMessage.messageType > MQConstants.MQCFT_STATUS) {
-            System.out.printf("Message is not in event message range. It is of type %d\n", mqMessage.messageType);
+            logger.error("Message is not in event message range. It is of type {}", mqMessage.messageType);
             return false;
         }
 
         int messageVersion = mqMessage.getVersion();
         if (messageVersion < MQConstants.MQCFH_VERSION_1 || messageVersion > MQConstants.MQCFH_CURRENT_VERSION) {
-            System.out.printf("Message header is the wrong version. Version is %d", messageVersion);
+            logger.error("Message header is the wrong version. Version is {}", messageVersion);
             return false;
         }
 

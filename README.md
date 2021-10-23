@@ -14,9 +14,7 @@ as such, it is critical that data integrity measures are used to ensure data saf
 
 ## Project Status
 Presently this project is in BETA. No guarantees are made about functionality or safety. It is **NOT** recommended
-to run this in production until a stable 1.0 release occurs. The debug flag is currently hard coded to true. If set
-to false, the app will run in an infinite loop and will not close handles to resources correctly when terminated.
-(Graceful handling of SIGTERM is a work in progress)
+to run this in production until a stable 1.0 release occurs.
 
 ## Design Goals
 ### Primary Goal - Flexibility of JSON Consumption
@@ -33,3 +31,8 @@ is an embarrassingly parallel problem, and performance in relation to message co
 increased with a larger number of clients. If a single instance of this app is not capable of handling your event
 workloads, run it in containers and spin up as many instances as you need in Docker, OpenShift, Kubernetes, whichever
 flavour you prefer.
+
+## Disclaimer
+This project is in no way affiliated with or formally supported by IBM, and any dependencies published by IBM are 
+copyrighted to IBM as per their license. Other open source dependencies are licensed under their respective licenses,
+refer to their websites for more information.

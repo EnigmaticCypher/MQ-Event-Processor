@@ -14,6 +14,7 @@ import org.json.JSONObject;
 
 import javax.jms.Queue;
 import javax.jms.*;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -22,6 +23,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.*;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class Main {
     private static String HOST;
@@ -32,6 +36,7 @@ public class Main {
     private static String OUTPUT_QUEUE_NAME;
     private static boolean DEBUG;
     private static volatile boolean SHUTDOWN = false;
+    private static Logger logger = null;
 
     private static final Map<Integer, String> openOptions = new LinkedHashMap<>() {{
         put(MQConstants.MQOO_ALTERNATE_USER_AUTHORITY, "altusr");
@@ -91,10 +96,13 @@ public class Main {
 
     public static void main(String[] args) {
         // Add SIGTERM handling
+        setupLogging();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Received shutdown signal, shutting down");
+            logger.info("Received SIGTERM, shutting down");
             SHUTDOWN = true;
         }));
+        // In exceptional circumstances, log exceptions we cannot expect.
+        Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> logger.fatal(thread + "threw exception " + exception));
 
         Main main = new Main();
         main.initialise();
@@ -113,21 +121,21 @@ public class Main {
                 startupProductionMode();
             }
         } catch (JMSException | IOException | MQDataException | JSONException exception) {
-            // TODO: Update this to use Log4J handling.
-            exception.printStackTrace();
+            logger.fatal(exception);
         }
+    }
+
+    private static void setupLogging() {
+        System.setProperty("log4j2.configurationFile", "config/log4j2.properties");
+        logger = LogManager.getFormatterLogger();
     }
 
     private static void readConfig() throws IOException {
         Properties config = new Properties();
         String fileName = "config/app.properties";
 
-        try (FileInputStream inputFileStream = new FileInputStream(fileName)) {
-            config.load(inputFileStream);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return;
-        }
+        FileInputStream inputFileStream = new FileInputStream(fileName);
+        config.load(inputFileStream);
 
         DEBUG = Boolean.parseBoolean(config.getProperty("debug"));
         HOST = config.getProperty("hostname");
@@ -183,7 +191,7 @@ public class Main {
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
-        System.out.printf("We processed %d messages in %d milliseconds\n", counter, totalTime);
+        logger.info("We processed %d messages in %d milliseconds", counter, totalTime);
     }
 
     private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {

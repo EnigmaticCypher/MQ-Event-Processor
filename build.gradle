@@ -22,6 +22,18 @@ application {
     mainClass = "task.Main"
 }
 
+run {
+    workingDir = temporaryDir // use gradle-provided temp dir for this task
+    doFirst {
+        delete temporaryDir  // clean hidden local state... thanks gradle...
+        mkdir temporaryDir  // remake temp dir
+        copy {  // clone src/dist etc. to temp working dir
+            with distributions.main.contents
+            into workingDir
+        }
+    }
+}
+
 test {
     useJUnitPlatform()
 }

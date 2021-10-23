@@ -14,6 +14,8 @@ import org.json.JSONObject;
 
 import javax.jms.Queue;
 import javax.jms.*;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.IllegalStateException;
 import java.time.Instant;
@@ -22,15 +24,13 @@ import java.time.ZonedDateTime;
 import java.util.*;
 
 public class Main {
-    // Create variables for the connection to MQ
-    // TODO: Implement properties file for this data, rather than hard coding it in the dev environment.
-    private static final String HOST = "192.168.112.132"; // Host name or IP address
-    private static final int PORT = 1414; // Listener port for your queue manager
-    private static final String CHANNEL = "CYPHER"; // Channel name
-    private static final String QMGR = "TST1"; // Queue manager name
-    private static final String QUEUE_NAME = "EVENTS.PROD.TEST"; // Queue that the application uses to put and get messages to and from
-    private static final String OUTPUT_QUEUE_NAME = "EVENT.OUTPUT.JSON";
-    private static final boolean DEBUG = false;
+    private static String HOST;
+    private static int PORT;
+    private static String CHANNEL;
+    private static String QMGR;
+    private static String INPUT_QUEUE_NAME;
+    private static String OUTPUT_QUEUE_NAME;
+    private static boolean DEBUG;
     private static volatile boolean SHUTDOWN = false;
 
     private static final Map<Integer, String> openOptions = new LinkedHashMap<>() {{
@@ -95,6 +95,7 @@ public class Main {
             System.out.println("Received shutdown signal, shutting down");
             SHUTDOWN = true;
         }));
+
         Main main = new Main();
         main.initialise();
     }
@@ -103,6 +104,7 @@ public class Main {
 
     private void initialise() {
         try {
+            readConfig();
             // TODO: Maybe make this application process messages in batches? This allows for more efficient MQCMIT
             // Which therefore means we should get better performance.
             if (DEBUG) {
@@ -114,6 +116,26 @@ public class Main {
             // TODO: Update this to use Log4J handling.
             exception.printStackTrace();
         }
+    }
+
+    private static void readConfig() throws IOException {
+        Properties config = new Properties();
+        String fileName = "config/app.properties";
+
+        try (FileInputStream inputFileStream = new FileInputStream(fileName)) {
+            config.load(inputFileStream);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        DEBUG = Boolean.parseBoolean(config.getProperty("debug"));
+        HOST = config.getProperty("hostname");
+        PORT = Integer.parseInt(config.getProperty("port"));
+        CHANNEL = config.getProperty("channel");
+        QMGR = config.getProperty("queue_manager");
+        INPUT_QUEUE_NAME = config.getProperty("input_queue_name");
+        OUTPUT_QUEUE_NAME = config.getProperty("output_queue_name");
     }
 
     private void startupDebugMode() throws JMSException, JSONException, IOException, MQDataException {
@@ -132,7 +154,7 @@ public class Main {
         connection = connectionFactory.createConnection();
         connection.start();
         session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-        inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
+        inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
         browser = session.createBrowser(inputQueue);
         messages = (Enumeration<Message>) browser.getEnumeration();
@@ -161,7 +183,7 @@ public class Main {
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
-        System.out.printf("We processed %d messages in %d milliseconds", counter, totalTime);
+        System.out.printf("We processed %d messages in %d milliseconds\n", counter, totalTime);
     }
 
     private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {
@@ -176,7 +198,7 @@ public class Main {
         connection = connectionFactory.createConnection();
         connection.start();
         session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-        inputQueue = session.createQueue("queue:///" + QUEUE_NAME);
+        inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
         producer = session.createProducer(outputQueue);
         consumer = session.createConsumer(inputQueue);

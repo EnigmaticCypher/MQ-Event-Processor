@@ -125,7 +125,7 @@ public class Main {
 
     private static void setupLogging() {
         System.setProperty("log4j2.configurationFile", "config/log4j2.properties");
-        logger = LogManager.getFormatterLogger();
+        logger = LogManager.getLogger();
     }
 
     private static void readConfig() throws IOException {

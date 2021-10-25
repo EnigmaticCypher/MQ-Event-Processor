@@ -163,7 +163,7 @@ public class Main {
         logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
         session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
         inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
-        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
+        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
         browser = session.createBrowser(inputQueue);
         logger.info("Created browser to queue {}", INPUT_QUEUE_NAME);
         messages = (Enumeration<Message>) browser.getEnumeration();
@@ -225,7 +225,7 @@ public class Main {
         logger.debug("Created and started connection");
         session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
         inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
-        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
+        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
         producer = session.createProducer(outputQueue);
         logger.debug("Created producer to queue {}", OUTPUT_QUEUE_NAME);
         consumer = session.createConsumer(inputQueue);

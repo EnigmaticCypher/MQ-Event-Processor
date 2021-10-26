@@ -119,7 +119,16 @@ public class Main {
                 startupProductionMode();
             }
         } catch (JMSException | IOException | MQDataException | JSONException exception) {
-            logger.fatal(exception);
+            List<String> exceptionMessages = new ArrayList<>();
+            exceptionMessages.add(exception.getMessage());
+            Throwable exceptionCause = exception.getCause();
+            while (exceptionCause != null) {
+                exceptionMessages.add(exceptionCause.getMessage());
+                exceptionCause = exceptionCause.getCause();
+            }
+            for (String message : exceptionMessages) {
+                logger.fatal(message);
+            }
         }
     }
 
@@ -212,24 +221,19 @@ public class Main {
     private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {
         // TODO: Make transacted a config option. Users may not want syncpoint enabled if they want to use this
         // with non-persistent event messages.
-        Connection connection;
-        Session session;
-        Queue inputQueue;
-        Queue outputQueue;
-        MessageProducer producer;
-        MessageConsumer consumer;
         JmsConnectionFactory connectionFactory = setupConnectionFactory();
-
-        connection = connectionFactory.createConnection();
+        Connection connection = connectionFactory.createConnection();
         connection.start();
-        logger.debug("Created and started connection");
-        session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-        inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
-        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
-        producer = session.createProducer(outputQueue);
-        logger.debug("Created producer to queue {}", OUTPUT_QUEUE_NAME);
-        consumer = session.createConsumer(inputQueue);
-        logger.debug("Created consumer to queue {}", INPUT_QUEUE_NAME);
+        logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
+
+        Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+        Queue inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
+        Queue outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
+
+        MessageProducer producer = session.createProducer(outputQueue);
+        logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);
+        MessageConsumer consumer = session.createConsumer(inputQueue);
+        logger.info("Created consumer to queue {}", INPUT_QUEUE_NAME);
 
         while (!SHUTDOWN) {
             Message message = consumer.receive();

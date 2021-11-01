@@ -229,6 +229,7 @@ public class Main {
         MessageConsumer consumer = session.createConsumer(inputQueue);
         logger.info("Created consumer to queue {}", INPUT_QUEUE_NAME);
 
+        logger.info("Beginning message processing...");
         while (!SHUTDOWN) {
             Message message = consumer.receive();
             logger.debug("Received new message, started new transaction");
@@ -253,6 +254,7 @@ public class Main {
             // load will determine the need for batched commits or not.
             session.commit();
             logger.debug("Committed current transaction");
+            logger.info("Completed processing for current message.");
         }
 
         producer.close();

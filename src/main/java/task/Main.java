@@ -154,29 +154,23 @@ public class Main {
     }
 
     private void startupDebugMode() throws JMSException, JSONException, IOException, MQDataException {
-        Connection connection;
-        Session session;
-        Queue inputQueue;
-        Queue outputQueue;
-        QueueBrowser browser;
-        Enumeration<Message> messages;
-        MessageProducer producer;
         JmsConnectionFactory connectionFactory = setupConnectionFactory();
 
         long startTime = System.currentTimeMillis();
         int counter = 0;
 
+        // TODO: Refactor the duplicate code here into a method maybe? Not quite sure how to go about this.
         logger.info("System running in debug mode! Messages will not be destructively consumed from the input queue.");
-        connection = connectionFactory.createConnection();
+        Connection connection = connectionFactory.createConnection();
         connection.start();
         logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
-        session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-        inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
-        outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
-        browser = session.createBrowser(inputQueue);
+        Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+        Queue inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
+        Queue outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
+        QueueBrowser browser = session.createBrowser(inputQueue);
         logger.info("Created browser to queue {}", INPUT_QUEUE_NAME);
-        messages = (Enumeration<Message>) browser.getEnumeration();
-        producer = session.createProducer(outputQueue);
+        Enumeration<Message> messages = (Enumeration<Message>) browser.getEnumeration();
+        MessageProducer producer = session.createProducer(outputQueue);
         logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);
 
         logger.info("Beginning message processing...");

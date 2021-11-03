@@ -4,6 +4,7 @@ import com.ibm.mq.MQMessage;
 import com.ibm.mq.constants.MQConstants;
 import com.ibm.mq.headers.MQDataException;
 import com.ibm.mq.headers.pcf.*;
+import com.ibm.mq.jms.MQDestination;
 import com.ibm.msg.client.jms.JmsConnectionFactory;
 import com.ibm.msg.client.jms.JmsFactoryFactory;
 import com.ibm.msg.client.wmq.WMQConstants;
@@ -108,6 +109,8 @@ public class Main {
 
     public Main() {}
 
+    // TODO: Fix MQIACF_ERROR_ID so that it shows one value in the JSON key. (Needs manual handling).
+    // TODO: Fix z/OS platform name lookup returning 3 values (MVS, OS390, and z/OS)
     private void initialise() {
         try {
             readConfig();
@@ -165,9 +168,13 @@ public class Main {
         connection.start();
         logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
         Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-        Queue inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
-        Queue outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
-        QueueBrowser browser = session.createBrowser(inputQueue);
+        MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
+        inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
+        inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);
+        MQDestination outputQueue = (MQDestination) session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
+        outputQueue.setMessageBodyStyle(WMQConstants.WMQ_MESSAGE_BODY_MQ);
+        outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
+        QueueBrowser browser = session.createBrowser((Queue) inputQueue);
         logger.info("Created browser to queue {}", INPUT_QUEUE_NAME);
         Enumeration<Message> messages = (Enumeration<Message>) browser.getEnumeration();
         MessageProducer producer = session.createProducer(outputQueue);
@@ -221,8 +228,12 @@ public class Main {
         logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
 
         Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
-        Queue inputQueue = session.createQueue("queue:///" + INPUT_QUEUE_NAME);
-        Queue outputQueue = session.createQueue("queue:///" + OUTPUT_QUEUE_NAME + "?targetClient=1");
+        MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
+        inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
+        inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);
+        MQDestination outputQueue = (MQDestination) session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
+        outputQueue.setMessageBodyStyle(WMQConstants.WMQ_MESSAGE_BODY_MQ);
+        outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
 
         MessageProducer producer = session.createProducer(outputQueue);
         logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);
@@ -1074,10 +1085,10 @@ public class Main {
             case MQConstants.MQIACF_MQCB_OPTIONS:
             case MQConstants.MQIACF_PUT_OPTIONS:
             case MQConstants.MQIACF_SUBRQ_OPTIONS:
-                // Note: These should only show up if formatting activity trace messages
+                // Note: The options should only show up if formatting activity trace messages
                 // This is not a formally supported function of this program.
                 // Nonetheless, we can at least format the data into hex and put it in the JSON.
-                eventData.put(formattedParameterName, String.format("0x%08X ", parameter.getIntValue()));
+                eventData.put(formattedParameterName, String.format("0x%08X", parameter.getIntValue()));
                 break;
             case MQConstants.MQIACF_LOG_REDUCTION:
                 filter = "MQLR_.*";
@@ -1285,7 +1296,7 @@ public class Main {
 
         if (rawConstant.contains("_Q_"))
             rawConstant = rawConstant.replace("_Q_", "_QUEUE_");
-        else if (rawConstant.contains("_Q"))
+        else if (rawConstant.endsWith("_Q"))
             rawConstant = rawConstant.replace("_Q", "_QUEUE");
 
         String outputString = rawConstant.substring(rawConstant.indexOf("_") + 1);

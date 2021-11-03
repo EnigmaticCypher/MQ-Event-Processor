@@ -110,7 +110,6 @@ public class Main {
     public Main() {}
 
     // TODO: Fix MQIACF_ERROR_ID so that it shows one value in the JSON key. (Needs manual handling).
-    // TODO: Fix z/OS platform name lookup returning 3 values (MVS, OS390, and z/OS)
     private void initialise() {
         try {
             readConfig();
@@ -675,6 +674,10 @@ public class Main {
                     // AIX is a Unix variant and will be reported as such.
                 } else if (valueName.contains("AIX")) {
                     valueName = "MQAT_UNIX";
+                // Bugfix for platform being returned with 3 values for z/OS. Java constants have MVS, OS390, and z/OS.
+                // We only want z/OS, so force it to this.
+                } else if (valueName.contains("MVS")) {
+                    valueName = "z/OS";
                 }
 
                 formattedParameterName = formatConstant(parameterName, true);

@@ -676,7 +676,7 @@ public class Main {
                 // Bugfix for platform being returned with 3 values for z/OS. Java constants have MVS, OS390, and z/OS.
                 // We only want z/OS, so force it to this.
                 } else if (valueName.contains("MVS")) {
-                    valueName = "z/OS";
+                    valueName = "zOS";
                 }
 
                 formattedParameterName = formatConstant(parameterName, true);

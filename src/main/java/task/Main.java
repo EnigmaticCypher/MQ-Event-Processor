@@ -109,7 +109,6 @@ public class Main {
 
     public Main() {}
 
-    // TODO: Fix MQIACF_ERROR_ID so that it shows one value in the JSON key. (Needs manual handling).
     private void initialise() {
         try {
             readConfig();
@@ -1081,8 +1080,11 @@ public class Main {
                 valueName = formatConstant(valueName);
                 eventData.put(formattedParameterName, valueName);
                 break;
-            case MQConstants.MQIACF_ENCODING:
             case MQConstants.MQIACF_ERROR_ID:
+                // Manual fix for the formatted lookup returning two values.
+                formattedParameterName = "errorId";
+                eventData.put(formattedParameterName, String.format("0x%08X", parameter.getIntValue()));
+            case MQConstants.MQIACF_ENCODING:
             case MQConstants.MQIACF_CONNECT_OPTIONS:
             case MQConstants.MQIACF_GET_OPTIONS:
             case MQConstants.MQIACF_MQCB_OPTIONS:

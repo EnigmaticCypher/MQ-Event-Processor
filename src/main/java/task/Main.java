@@ -1290,8 +1290,6 @@ public class Main {
     }
 
     private String formatConstant(String rawConstant, boolean jsonMode) {
-        // TODO: Make formatConstant() handle z/OS and other OS related strings.
-        // Refer to formatConstantBase() from amqsevt.
         if (!rawConstant.contains("_")) {
             return rawConstant;
         }

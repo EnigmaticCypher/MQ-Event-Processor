@@ -1084,6 +1084,7 @@ public class Main {
                 // Manual fix for the formatted lookup returning two values.
                 formattedParameterName = "errorId";
                 eventData.put(formattedParameterName, String.format("0x%08X", parameter.getIntValue()));
+                break;
             case MQConstants.MQIACF_ENCODING:
             case MQConstants.MQIACF_CONNECT_OPTIONS:
             case MQConstants.MQIACF_GET_OPTIONS:

@@ -548,6 +548,11 @@ public class Main {
                         valueName = MQConstants.lookup(value, "MQBACF_.*");
                     }
 
+                    // Manual bugfix, MQCACH_CHANNEL_NAME and MQCACH_FIRST share a constant... yay.
+                    if (value == 3501) {
+                        valueName = "MQCACH_CHANNEL_NAME";
+                    }
+
                     valueName = formatConstant(valueName);
                     valueNames.add(valueName);
                     break;

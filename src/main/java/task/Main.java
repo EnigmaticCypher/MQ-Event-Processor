@@ -1,5 +1,7 @@
 package task;
 
+import static task.ConstantMap.*;
+
 import com.ibm.mq.MQMessage;
 import com.ibm.mq.constants.MQConstants;
 import com.ibm.mq.headers.MQDataException;
@@ -22,6 +24,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.function.IntFunction;
+import java.util.function.Supplier;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -494,14 +499,14 @@ public class Main {
             switch (parameter.getParameter()) {
                 case MQConstants.MQIACH_HDR_COMPRESSION:
                 case MQConstants.MQIACH_MSG_COMPRESSION:
-                    valueName = MQConstants.lookup(value, "MQCOMPRESS_.*");
+                    valueName = MQCOMPRESS_STR(value);
                     valueName = formatConstant(valueName);
                     valueNames.add(valueName);
                     break;
                 case MQConstants.MQIACF_AUTH_ADD_AUTHS:
                 case MQConstants.MQIACF_AUTH_REMOVE_AUTHS:
                 case MQConstants.MQIACF_AUTHORIZATION_LIST:
-                    valueName = MQConstants.lookup(value, "MQAUTH_.*");
+                    valueName = MQAUTH_STR(value);
                     valueName = formatConstant(valueName);
                     valueNames.add(valueName);
                     break;
@@ -537,7 +542,6 @@ public class Main {
                 case MQConstants.MQIACF_XR_ATTRS:
                 case MQConstants.MQIACH_CHANNEL_INSTANCE_ATTRS:
                 case MQConstants.MQIACH_CHANNEL_SUMMARY_ATTRS:
-                    // This is a bit ugly, is there a nicer way to write this?
                     valueName = lookupMultiMQConstant(value, "MQIA");
 
                     if (valueName == null) {
@@ -545,7 +549,7 @@ public class Main {
                     }
 
                     if (valueName == null) {
-                        valueName = MQConstants.lookup(value, "MQBACF_.*");
+                        valueName = MQBACF_STR(value);
                     }
 
                     // Manual bugfix, MQCACH_CHANNEL_NAME and MQCACH_FIRST share a constant... yay.
@@ -557,7 +561,7 @@ public class Main {
                     valueNames.add(valueName);
                     break;
                 case MQConstants.MQIA_SUITE_B_STRENGTH:
-                    valueName = MQConstants.lookup(value, "MQ_SUITE_.*");
+                    valueName = MQ_SUITE_STR(value);
                     valueName = formatConstant(valueName);
                     valueNames.add(valueName);
                     break;

@@ -2,6 +2,8 @@ package task;
 
 public class ConstantMap {
     /*
+    Client version generated from: 9.2.0.1
+
     The following methods are ported from cmqstrc.h in the MQ client libraries. A simple python
     script with some regular expressions can refactor the C code into syntactically valid Java,
     which is then reformatted by IntelliJ or another acceptable IDE with code formatting capabilities.

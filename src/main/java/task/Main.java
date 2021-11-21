@@ -485,9 +485,14 @@ public class Main {
     }
 
     private void processCFIL64(MQCFIL64 parameter, JSONObject eventData) throws JSONException {
-        String formattedParameterName = formatConstant(parameter.getParameterName(), true);
-        long[] values = parameter.getValues();
-        eventData.put(formattedParameterName, values);
+        String parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQIA");
+        if (parameterName != null) {
+            String formattedParameterName = formatConstant(parameterName, true);
+            long[] values = parameter.getValues();
+            eventData.put(formattedParameterName, values);
+        } else {
+            throw new IllegalArgumentException(String.format("Parameter name lookup for CFIL64 returned null. Integer value was: %d", parameter.getParameter()));
+        }
     }
 
     private void processCFIL(MQCFIL parameter, JSONObject eventData) throws JSONException {

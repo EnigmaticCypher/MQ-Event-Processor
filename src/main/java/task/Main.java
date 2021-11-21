@@ -474,7 +474,8 @@ public class Main {
     private void processCFGR(MQCFGR parameter, JSONObject eventData) throws JSONException {
         Enumeration<PCFParameter> parameters = parameter.getParameters();
 
-        String formattedParameterName = formatConstant(parameter.getParameterName(), true);
+        String parameterName = MQGACF_STR(parameter.getParameter());
+        String formattedParameterName = formatConstant(parameterName, true);
         JSONObject groupData = new JSONObject();
         while (parameters.hasMoreElements()) {
             PCFParameter pcfParameter = parameters.nextElement();

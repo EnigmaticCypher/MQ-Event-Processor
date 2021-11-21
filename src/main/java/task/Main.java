@@ -1209,7 +1209,7 @@ public class Main {
 
     private void processCFIF(MQCFIF parameter, JSONObject eventData) throws JSONException {
         String formattedParameterName = formatConstant(parameter.getParameterName());
-        String operatorName = MQConstants.lookup(parameter.getOperator(), "MQCFOP_.*");
+        String operatorName = MQCFOP_STR(parameter.getOperator());
         String formattedOperatorName = formatConstant(operatorName);
         String output = String.format("WHERE '%s' %s '%d'", formattedParameterName, formattedOperatorName, parameter.getFilterValue());
         eventData.put("filter", output);

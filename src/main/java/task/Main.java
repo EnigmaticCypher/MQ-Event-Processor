@@ -610,9 +610,14 @@ public class Main {
     }
 
     private void processCFIN64(MQCFIN64 parameter, JSONObject eventData) throws JSONException {
-        String formattedParameterName = formatConstant(parameter.getParameterName(), true);
-        long value = parameter.getLongValue();
-        eventData.put(formattedParameterName, value);
+        String parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQIA");
+        if (parameterName != null) {
+            String formattedParameterName = formatConstant(parameterName, true);
+            long value = parameter.getLongValue();
+            eventData.put(formattedParameterName, value);
+        } else {
+            throw new IllegalArgumentException(String.format("Parameter name lookup for CFIN64 returned null! Integer value was: %d", parameter.getParameter()));
+        }
     }
 
     private void processCFIN(MQCFIN parameter, JSONObject eventData) throws JSONException {

@@ -1239,25 +1239,39 @@ public class Main {
 
     /*
         This function should only be used for MQIA or MQCA lookups. All others can be done
-        normally with MQConstants.lookup(). These two are... "painful" because of the
-        potential for more than 1 result from MQConstants.lookup() when specifying all of
-        these filters at once. Therefore, we do one lookup per filter until we find a match.
+        normally with ConstantMap lookups. These two are... "painful" because of the overlap
+        they have between eachother, and some parameter values can be any single one of these.
+        Rather than doing these searches individually in the case statement, this has been
+        wrapped into a helper method to keep the switch/case statements tidier.
     */
     private String lookupMultiMQConstant(int parameterValue, String filter) {
         String valueName;
-        List<String> filters;
+        List<Supplier<String>> filters;
 
         if (filter.equals("MQIA")) {
-            filters = Arrays.asList("MQIA_.*", "MQIACF_.*", "MQIACH_.*", "MQIAMO_.*", "MQIAMO64_.*");
+            filters = Arrays.asList(
+                    () -> MQIA_STR(parameterValue),
+                    () -> MQIACF_STR(parameterValue),
+                    () -> MQIACH_STR(parameterValue),
+                    () -> MQIAMO_STR(parameterValue),
+                    () -> MQIAMO64_STR(parameterValue)
+            );
         } else if (filter.equals("MQCA")) {
-            filters = Arrays.asList("MQCA_.*", "MQCACF_.*", "MQCACH_.*", "MQCAMO_.*");
+            filters = Arrays.asList(
+                    () -> MQCA_STR(parameterValue),
+                    () -> MQCACF_STR(parameterValue),
+                    () -> MQCACH_STR(parameterValue),
+                    () -> MQCAMO_STR(parameterValue)
+            );
         } else {
             throw new IllegalArgumentException(String.format("Illegal filter type passed in: %s", filter));
         }
 
-        for (String currentFilter : filters) {
-            valueName = MQConstants.lookup(parameterValue, currentFilter);
-            if (valueName != null) {
+        for (Supplier<String> currentFilter : filters) {
+            valueName = currentFilter.get();
+            // Default value returned from ConstantMap methods is "". Therefore if we get ""
+            // then keep going.
+            if (!valueName.equals("")) {
                 return valueName;
             }
         }

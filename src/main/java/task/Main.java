@@ -577,7 +577,13 @@ public class Main {
             }
         }
 
-        eventData.put(formatConstant(parameter.getParameterName(), true), valueNames);
+        String parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQIA");
+        if (parameterName != null) {
+            String formattedParameterName = formatConstant(parameterName, true);
+            eventData.put(formattedParameterName, valueNames);
+        } else {
+            throw new IllegalArgumentException(String.format("Parameter name lookup for CFIL returned null! Integer value was: %d", parameter.getParameter()));
+        }
     }
 
     private void processCFSL(MQCFSL parameter, JSONObject eventData) throws JSONException {

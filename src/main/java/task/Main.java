@@ -1140,7 +1140,8 @@ public class Main {
     }
 
     private void processCFBS(MQCFBS parameter, JSONObject eventData) throws JSONException {
-        String formattedParameterName = formatConstant(parameter.getParameterName(), true);
+        String parameterName = MQBACF_STR(parameter.getParameter());
+        String formattedParameterName = formatConstant(parameterName, true);
         byte[] hexBytes = parameter.getString();
 
         StringBuilder result = new StringBuilder();

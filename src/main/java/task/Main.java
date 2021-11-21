@@ -1217,7 +1217,7 @@ public class Main {
 
     private void processCFSF(MQCFSF parameter, JSONObject eventData) throws JSONException {
         String formattedParameterName = formatConstant(parameter.getParameterName());
-        String operator = MQConstants.lookup(parameter.getOperator(), "MQCFOP_.*");
+        String operator = MQCFOP_STR(parameter.getOperator());
         String formattedOperator = formatConstant(operator);
         String output = String.format("WHERE '%s' %s '%s'", formattedParameterName, formattedOperator, parameter.getFilterValue());
         eventData.put("filter", output);

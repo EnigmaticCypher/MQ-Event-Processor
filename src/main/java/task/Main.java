@@ -1167,11 +1167,16 @@ public class Main {
     }
 
     private void processCFSF(MQCFSF parameter, JSONObject eventData) throws JSONException {
-        String formattedParameterName = formatConstant(parameter.getParameterName());
-        String operator = MQCFOP_STR(parameter.getOperator());
-        String formattedOperator = formatConstant(operator);
-        String output = String.format("WHERE '%s' %s '%s'", formattedParameterName, formattedOperator, parameter.getFilterValue());
-        eventData.put("filter", output);
+        String parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQCA");
+        if (parameterName != null) {
+            String formattedParameterName = formatConstant(parameterName);
+            String operator = MQCFOP_STR(parameter.getOperator());
+            String formattedOperator = formatConstant(operator);
+            String output = String.format("WHERE '%s' %s '%s'", formattedParameterName, formattedOperator, parameter.getFilterValue());
+            eventData.put("filter", output);
+        } else {
+            throw new IllegalArgumentException(String.format("Parameter name lookup for CFSF returned null! Integer value was: %d", parameter.getParameter()));
+        }
     }
 
     private void processCFBF(MQCFBF parameter, JSONObject eventData) throws JSONException {

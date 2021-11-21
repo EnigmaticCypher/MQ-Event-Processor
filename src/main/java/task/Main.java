@@ -336,20 +336,22 @@ public class Main {
     }
 
     private JSONObject getEventType(MQCFH pcfHeader) throws JSONException {
-        String command = MQConstants.lookup(pcfHeader.getCommand(), "MQCMD_.*");
-        command = formatConstant(command);
+        int commandInt = pcfHeader.getCommand();
+        String commandString = MQCMD_STR(commandInt);
+        commandString = formatConstant(commandString);
         JSONObject eventType = new JSONObject();
-        eventType.put("name", command);
-        eventType.put("value", pcfHeader.getCommand());
+        eventType.put("name", commandString);
+        eventType.put("value", commandInt);
         return eventType;
     }
 
     private JSONObject getEventReason(MQCFH pcfHeader) throws JSONException {
-        String eventReasonString = MQConstants.lookupReasonCode(pcfHeader.getReason());
+        int eventReasonInt = pcfHeader.getReason();
+        String eventReasonString = MQRC_STR(eventReasonInt);
         eventReasonString = formatConstant(eventReasonString);
         JSONObject eventReason = new JSONObject();
         eventReason.put("name", eventReasonString);
-        eventReason.put("value", pcfHeader.getReason());
+        eventReason.put("value", eventReasonInt);
         return eventReason;
     }
 

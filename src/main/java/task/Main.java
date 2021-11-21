@@ -598,10 +598,15 @@ public class Main {
     }
 
     private void processCFST(MQCFST parameter, JSONObject eventData) throws JSONException {
-        String formattedParameterName = formatConstant(parameter.getParameterName(), true);
-        // Trim off the excess spaces that come from IBM's spacing requirements.
-        String value = parameter.getString().trim();
-        eventData.put(formattedParameterName, value);
+        String parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQCA");
+        if (parameterName != null) {
+            String formattedParameterName = formatConstant(parameterName, true);
+            // Trim off the excess spaces that come from IBM's spacing requirements.
+            String value = parameter.getString().trim();
+            eventData.put(formattedParameterName, value);
+        } else {
+            throw new IllegalArgumentException(String.format("Parameter name lookup for CFST returned null! Integer value was: %d", parameter.getParameter()));
+        }
     }
 
     private void processCFIN64(MQCFIN64 parameter, JSONObject eventData) throws JSONException {

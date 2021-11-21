@@ -587,9 +587,14 @@ public class Main {
     }
 
     private void processCFSL(MQCFSL parameter, JSONObject eventData) throws JSONException {
-        String formattedParameterName = formatConstant(parameter.getParameterName(), true);
-        String[] values = parameter.getStrings();
-        eventData.put(formattedParameterName, values);
+        String parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQCA");
+        if (parameterName != null) {
+            String formattedParameterName = formatConstant(parameterName, true);
+            String[] values = parameter.getStrings();
+            eventData.put(formattedParameterName, values);
+        } else {
+            throw new IllegalArgumentException(String.format("Parameter name lookup for CFSL returned null! Integer value was: %d", parameter.getParameter()));
+        }
     }
 
     private void processCFST(MQCFST parameter, JSONObject eventData) throws JSONException {

@@ -605,9 +605,9 @@ public class Main {
 
         String formattedParameterName = formatConstant(parameterName, true);
 
-        int parameterValue;
+        final int parameterValue = parameter.getIntValue();
         String valueName;
-        String filter = "";
+        Supplier<String> newFilter = null;
         JSONObject optionsJSON;
 
         switch (parameter.getParameter()) {
@@ -623,74 +623,54 @@ public class Main {
             case MQConstants.MQIA_STATISTICS_CHANNEL:
             case MQConstants.MQIA_STATISTICS_MQI:
             case MQConstants.MQIA_STATISTICS_Q:
-                if (parameter.getIntValue() == 253) {
+                // We can't alter the parameterValue as it's final (this is done to satisfy lambda requirements)
+                // But what we can do is copy it, and then manually handle the z/OS bug.
+                int tempValue = parameterValue;
+                if (parameterValue == 253) {
                     // Bug in some z/OS versions - ported from amqsevt
-                    parameter.setIntValue(-3);
+                    tempValue = -3;
                 }
-                // Need manual handling because of MQMON_OFF/MQMON_DISABLED being the same value.
-                valueName = MQConstants.lookup(parameter.getIntValue(), "MQMON_.*");
-                if (valueName.contains("MQMON_DISABLED")) {
-                    valueName = "MQMON_OFF";
-                }
-                valueName = formatConstant(valueName);
 
+                valueName = MQMON_STR(tempValue);
+                valueName = formatConstant(valueName);
                 eventData.put(formattedParameterName, valueName);
                 break;
             case MQConstants.MQIA_ACTIVITY_RECORDING:
             case MQConstants.MQIA_TRACE_ROUTE_RECORDING:
-                filter = "MQRECORDING_.*";
+                newFilter = () -> MQRECORDING_STR(parameterValue);
                 break;
             case MQConstants.MQIA_ADOPT_CONTEXT:
-                filter = "MQADPCTX_.*";
+                newFilter = () -> MQADPCTX_STR(parameterValue);
                 break;
             case MQConstants.MQIA_ADOPTNEWMCA_CHECK:
-                filter = "MQADOPT_CHECK_.*";
+                newFilter = () -> MQADOPT_CHECK_STR(parameterValue);
                 break;
             case MQConstants.MQIA_ADOPTNEWMCA_TYPE:
-                filter = "MQADOPT_TYPE_.*";
+                newFilter = () -> MQADOPT_TYPE_STR(parameterValue);
                 break;
             case MQConstants.MQIA_APPL_TYPE :
             case MQConstants.MQIACF_EVENT_APPL_TYPE :
                 // Manual handling for parameter name here because MQConstants.lookup() returns
                 // ambiguous results which are not applicable.
-                parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQIA");
+                int parameterNameInt = parameter.getParameter();
+                parameterName = lookupMultiMQConstant(parameterNameInt, "MQIA");
                 // Handle potential null return from lookupMultiMQConstant().
                 if (parameterName == null) {
                     throw new IllegalStateException(
                             String.format("Parameter name for CFIN related constant is null! Integer value: %d",
-                                    parameter.getIntValue()));
+                                    parameterNameInt));
                 }
-                // Further bugfix because even after manual handling, there are *still* inconsistencies in the MQIA
-                // constants. Fix this to make things properly consistent. Note that this manual override will cause
-                // problems if a user attempts to consume messages published from the $SYS/MQ topics.
-                if (parameterName.contains("MQIA_FIRST")) {
-                    parameterName = "MQIA_APPL_TYPE";
-                }
-                valueName = MQConstants.lookup(parameter.getIntValue(), "MQAT_.*");
-                // Within JMS classes it appears that the MQAT_DEFAULT is the same as MQAT_JAVA.
-                // We don't want this showing up in events, so if we see it then remove it.
-                if (valueName.contains("DEFAULT")) {
-                    valueName = "MQAT_JAVA";
-                    // Bugfix for certain not_authorised events showing AIX as a separate platform to UNIX.
-                    // AIX is a Unix variant and will be reported as such.
-                } else if (valueName.contains("AIX")) {
-                    valueName = "MQAT_UNIX";
-                // Bugfix for platform being returned with 3 values for z/OS. Java constants have MVS, OS390, and z/OS.
-                // We only want z/OS, so force it to this.
-                } else if (valueName.contains("MVS")) {
-                    valueName = "zOS";
-                }
-
+                valueName = MQAT_STR(parameterValue);
                 formattedParameterName = formatConstant(parameterName, true);
                 valueName = formatConstant(valueName);
 
                 eventData.put(formattedParameterName, valueName);
                 break;
             case MQConstants.MQIA_AUTH_INFO_TYPE :
-                filter = "MQAIT_.*";
+                newFilter = () -> MQAIT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_AUTHENTICATION_METHOD:
-                filter = "MQAUTHENTICATE_.*";
+                newFilter = () -> MQAUTHENTICATE_STR(parameterValue);
                 break;
             case MQConstants.MQIA_AUTHORITY_EVENT:
             case MQConstants.MQIA_BRIDGE_EVENT:
@@ -710,265 +690,239 @@ public class Main {
             case MQConstants.MQIA_REMOTE_EVENT:
             case MQConstants.MQIA_START_STOP_EVENT:
             case MQConstants.MQIA_SSL_EVENT:
-                filter = "MQEVR_.*";
+                newFilter = () -> MQEVR_STR(parameterValue);
                 break;
             case MQConstants.MQIA_AUTO_REORGANIZATION:
-                filter = "MQREORG_.*";
+                newFilter = () -> MQREORG_STR(parameterValue);
                 break;
             case MQConstants.MQIA_BASE_TYPE :
-                filter = "MQOT_.*";
+                newFilter = () -> MQOT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CERT_VAL_POLICY:
-                valueName = MQConstants.lookup(parameter.getIntValue(), "MQ_CERT_.*");
-                // Default policy is the ANY policy, therefore change the resultant
-                // value name to reflect this. Note that the C _STR functions do not
-                // include the DEFAULT constant name.
-                if (valueName.contains("MQ_CERT_VAL_POLICY_DEFAULT")) {
-                    valueName = "MQ_CERT_VAL_POLICY_ANY";
-                }
-
-                valueName = formatConstant(valueName);
-                eventData.put(formattedParameterName, valueName);
-
+                newFilter = () -> MQ_CERT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CF_CFCONLOS:
             case MQConstants.MQIA_QMGR_CFCONLOS:
-                filter = "MQCFCONLOS_.*";
+                newFilter = () -> MQCFCONLOS_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CF_RECAUTO:
-                filter = "MQRECAUTO_.*";
+                newFilter = () -> MQRECAUTO_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CF_RECOVER:
-                filter = "MQCFR_.*";
+                newFilter = () -> MQCFR_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CHANNEL_AUTO_DEF:
-                filter = "MQCHAD_.*";
+                newFilter = () -> MQCHAD_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CHECK_CLIENT_BINDING:
             case MQConstants.MQIA_CHECK_LOCAL_BINDING:
-                filter = "MQCHK_.*";
+                newFilter = () -> MQCHK_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CHINIT_CONTROL:
             case MQConstants.MQIA_CMD_SERVER_CONTROL:
             case MQConstants.MQIA_SERVICE_CONTROL:
             case MQConstants.MQIACH_LISTENER_CONTROL:
-                filter = "MQSVC_CONTROL_.*";
+                newFilter = () -> MQSVC_CONTROL_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CHINIT_TRACE_AUTO_START:
-                filter = "MQTRAXSTR_.*";
+                newFilter = () -> MQTRAXSTR_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CHLAUTH_RECORDS:
-                filter = "MQCHLA_.*";
+                newFilter = () -> MQCHLA_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CLUSTER_PUB_ROUTE:
-                filter = "MQCLROUTE_.*";
+                newFilter = () -> MQCLROUTE_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CLWL_USEQ :
-                filter = "MQCLWL_.*";
+                newFilter = () -> MQCLWL_STR(parameterValue);
                 break;
             case MQConstants.MQIA_COMM_INFO_TYPE:
-                filter = "MQCIT_.*";
+                newFilter = () -> MQCIT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DEF_BIND:
-                filter = "MQBND_.*";
+                newFilter = () -> MQBND_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DEF_CLUSTER_XMIT_Q_TYPE:
-                filter = "MQCLXQ_.*";
+                newFilter = () -> MQCLXQ_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DEF_INPUT_OPEN_OPTION:
-                filter = "MQOO_.*";
+                newFilter = () -> MQOO_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DEF_PERSISTENCE:
             case MQConstants.MQIA_TOPIC_DEF_PERSISTENCE:
-                filter = "MQPER_.*";
+                newFilter = () -> MQPER_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DEF_PUT_RESPONSE_TYPE:
-                filter = "MQPRT_.*";
+                newFilter = () -> MQPRT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DEF_READ_AHEAD:
-                filter = "MQREADA_.*";
+                newFilter = () -> MQREADA_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DEFINITION_TYPE :
-                filter = "MQQDT_.*";
+                newFilter = () -> MQQDT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DIST_LISTS:
-                filter = "MQDL_.*";
+                newFilter = () -> MQDL_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DNS_WLM:
-                filter = "MQDNSWLM_.*";
+                newFilter = () -> MQDNSWLM_STR(parameterValue);
                 break;
             case MQConstants.MQIA_DURABLE_SUB:
-                filter = "MQSUB_.*";
+                newFilter = () -> MQSUB_STR(parameterValue);
                 break;
             case MQConstants.MQIA_ENCRYPTION_ALGORITHM:
-                filter = "MQMLP_ENCRYPTION_.*";
+                newFilter = () -> MQMLP_ENCRYPTION_STR(parameterValue);
                 break;
             case MQConstants.MQIA_GROUP_UR:
-                filter = "MQGUR_.*";
+                newFilter = () -> MQGUR_STR(parameterValue);
                 break;
             case MQConstants.MQIA_HARDEN_GET_BACKOUT:
-                filter = "MQQA_BACKOUT_.*";
+                newFilter = () -> MQQA_BACKOUT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_IGQ_PUT_AUTHORITY:
-                filter = "MQIGQPA_.*";
+                newFilter = () -> MQIGQPA_STR(parameterValue);
                 break;
             case MQConstants.MQIA_INDEX_TYPE :
-                filter = "MQIT_.*";
+                newFilter = () -> MQIT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_INHIBIT_GET :
-                filter = "MQQA_GET_.*";
+                newFilter = () -> MQQA_GET_STR(parameterValue);
                 break;
             case MQConstants.MQIA_INHIBIT_PUB :
-                filter = "MQTA_PUB_.*";
+                newFilter = () -> MQTA_PUB_STR(parameterValue);
                 break;
             case MQConstants.MQIA_INHIBIT_PUT :
-                filter = "MQQA_PUT_.*";
+                newFilter = () -> MQQA_PUT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_INHIBIT_SUB :
-                filter = "MQTA_SUB_.*";
+                newFilter = () -> MQTA_SUB_STR(parameterValue);
                 break;
             case MQConstants.MQIA_INTRA_GROUP_QUEUING:
-                filter = "MQIGQ_.*";
+                newFilter = () -> MQIGQ_STR(parameterValue);
                 break;
             case MQConstants.MQIA_IP_ADDRESS_VERSION:
-                filter = "MQIPADDR_.*";
+                newFilter = () -> MQIPADDR_STR(parameterValue);
                 break;
             case MQConstants.MQIA_LDAP_AUTHORMD:
-                filter = "MQLDAP_AUTHORMD_.*";
+                newFilter = () -> MQLDAP_AUTHORMD_STR(parameterValue);
                 break;
             case MQConstants.MQIA_LDAP_NESTGRP:
-                filter = "MQLDAP_NESTGRP_.*";
+                newFilter = () -> MQLDAP_NESTGRP_STR(parameterValue);
                 break;
             case MQConstants.MQIA_LDAP_SECURE_COMM:
-                filter = "MQSECCOMM_.*";
+                newFilter = () -> MQSECCOMM_STR(parameterValue);
                 break;
             case MQConstants.MQIA_MCAST_BRIDGE:
-                filter = "MQMCB_.*";
+                newFilter = () -> MQMCB_STR(parameterValue);
                 break;
             case MQConstants.MQIA_MSG_DELIVERY_SEQUENCE :
-                filter = "MQMDS_.*";
+                newFilter = () -> MQMDS_STR(parameterValue);
                 break;
             case MQConstants.MQIA_MULTICAST:
-                filter = "MQMC_.*";
+                newFilter = () -> MQMC_STR(parameterValue);
                 break;
             case MQConstants.MQIA_NAMELIST_TYPE:
-                filter = "MQNT_.*";
+                newFilter = () -> MQNT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_NPM_CLASS:
-                filter = "MQNPM_.*";
+                newFilter = () -> MQNPM_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PLATFORM:
-                parameterValue = parameter.getIntValue();
-                // AIX is a variant of UNIX. AIX constant string does not exist
-                // in C constants, so we ignore it and mark as UNIX to be consistent with C.
-                if (parameterValue == 3) {
-                    valueName = "MQPL_UNIX";
-                    // Same thing with MVS / OS390. These are old names for ZOS, and they don't
-                    // exist in the C constants, so we force the value to ZOS.
-                } else if (parameterValue == 1) {
-                    valueName = "MQPL_ZOS";
-                } else {
-                    valueName = MQConstants.lookup(parameterValue, "MQPL_.*");
-                }
-
-                valueName = formatConstant(valueName);
-                eventData.put(formattedParameterName, valueName);
-
+                newFilter = () -> MQPL_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PM_DELIVERY:
             case MQConstants.MQIA_NPM_DELIVERY:
-                filter = "MQDLV_.*";
+                newFilter = () -> MQDLV_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PROPERTY_CONTROL:
-                filter = "MQPROP_.*";
+                newFilter = () -> MQPROP_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PROXY_SUB:
-                filter = "MQTA_PROXY_.*";
+                newFilter = () -> MQTA_PROXY_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PUB_SCOPE :
             case MQConstants.MQIA_SUB_SCOPE :
-                filter = "MQSCOPE_.*";
+                newFilter = () -> MQSCOPE_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PUBSUB_CLUSTER:
-                filter = "MQPSCLUS_.*";
+                newFilter = () -> MQPSCLUS_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PUBSUB_MODE:
-                filter = "MQPSM_.*";
+                newFilter = () -> MQPSM_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PUBSUB_NP_MSG:
             case MQConstants.MQIA_PUBSUB_NP_RESP:
-                filter = "MQUNDELIVERED_.*";
+                newFilter = () -> MQUNDELIVERED_STR(parameterValue);
                 break;
             case MQConstants.MQIA_PUBSUB_SYNC_PT:
-                filter = "MQSYNCPOINT_.*";
+                newFilter = () -> MQSYNCPOINT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_Q_TYPE :
-                filter = "MQQT_.*";
+                newFilter = () -> MQQT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_QSG_DISP:
-                filter = "MQQSGD_.*";
+                newFilter = () -> MQQSGD_STR(parameterValue);
                 break;
             case MQConstants.MQIA_RECEIVE_TIMEOUT_TYPE:
-                filter = "MQRCVTIME_.*";
+                newFilter = () -> MQRCVTIME_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_REFRESH_TYPE:
-                filter = "MQRT_.*";
+                newFilter = () -> MQRT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_REVERSE_DNS_LOOKUP:
-                filter = "MQRDNS_.*";
+                newFilter = () -> MQRDNS_STR(parameterValue);
                 break;
             case MQConstants.MQIA_SCOPE:
-                filter = "MQSCO_.*";
+                newFilter = () -> MQSCO_STR(parameterValue);
                 break;
             case MQConstants.MQIA_SECURITY_CASE:
-                filter = "MQSCYC_.*";
+                newFilter = () -> MQSCYC_STR(parameterValue);
                 break;
             case MQConstants.MQIA_SERVICE_TYPE:
-                filter = "MQSVC_TYPE_.*";
+                newFilter = () -> MQSVC_TYPE_STR(parameterValue);
                 break;
             case MQConstants.MQIA_SHARED_Q_Q_MGR_NAME:
-                filter = "MQSQQM_.*";
+                newFilter = () -> MQSQQM_STR(parameterValue);
                 break;
             case MQConstants.MQIA_SIGNATURE_ALGORITHM:
-                filter = "MQMLP_SIGN_.*";
+                newFilter = () -> MQMLP_SIGN_STR(parameterValue);
                 break;
             case MQConstants.MQIA_SSL_FIPS_REQUIRED:
-                filter = "MQSSL_.*";
+                newFilter = () -> MQSSL_STR(parameterValue);
                 break;
             case MQConstants.MQIA_SYNCPOINT:
-                filter = "MQSP_.*";
+                newFilter = () -> MQSP_STR(parameterValue);
                 break;
             case MQConstants.MQIA_TCP_KEEP_ALIVE:
-                filter = "MQTCPKEEP_.*";
+                newFilter = () -> MQTCPKEEP_STR(parameterValue);
                 break;
             case MQConstants.MQIA_TCP_STACK_TYPE:
-                filter = "MQTCPSTACK_.*";
+                newFilter = () -> MQTCPSTACK_STR(parameterValue);
                 break;
             case MQConstants.MQIA_TOLERATE_UNPROTECTED:
-                filter = "MQMLP_TOLERATE_.*";
+                newFilter = () -> MQMLP_TOLERATE_STR(parameterValue);
                 break;
             case MQConstants.MQIA_TOPIC_TYPE:
-                filter = "MQTOPT_.*";
+                newFilter = () -> MQTOPT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_TRIGGER_CONTROL:
-                filter = "MQTC_.*";
+                newFilter = () -> MQTC_STR(parameterValue);
                 break;
             case MQConstants.MQIA_TRIGGER_TYPE :
-                filter = "MQTT_.*";
+                newFilter = () -> MQTT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_USAGE:
-                filter = "MQUS_.*";
+                newFilter = () -> MQUS_STR(parameterValue);
                 break;
             case MQConstants.MQIA_USE_DEAD_LETTER_Q:
-                filter = "MQUSEDLQ_.*";
+                newFilter = () -> MQUSEDLQ_STR(parameterValue);
                 break;
             case MQConstants.MQIA_WILDCARD_OPERATION:
-                filter = "MQTA_.*";
+                newFilter = () -> MQTA_STR(parameterValue);
                 break;
             case MQConstants.MQIA_CODED_CHAR_SET_ID:
-                parameterValue = parameter.getIntValue();
                 if (parameterValue <= 0) {
-                    valueName = MQConstants.lookup(parameterValue, "MQCCSI_.*");
+                    valueName = MQCCSI_STR(parameterValue);
                     valueName = formatConstant(valueName);
                     eventData.put(formattedParameterName, valueName);
                 } else {
@@ -976,9 +930,8 @@ public class Main {
                 }
                 break;
             case MQConstants.MQIA_MAX_PROPERTIES_LENGTH:
-                parameterValue = parameter.getIntValue();
                 if (parameterValue <= 0) {
-                    valueName = MQConstants.lookup(parameterValue, "MQPROP_.*");
+                    valueName = MQPROP_STR(parameterValue);
                     valueName = formatConstant(valueName);
                     eventData.put(formattedParameterName, valueName);
                 } else {
@@ -986,9 +939,8 @@ public class Main {
                 }
                 break;
             case MQConstants.MQIA_DEF_PRIORITY:
-                parameterValue = parameter.getIntValue();
                 if (parameterValue < 0) {
-                    valueName = MQConstants.lookup(parameterValue, "MQPRI_.*");
+                    valueName = MQPRI_STR(parameterValue);
                     valueName = formatConstant(valueName);
                     eventData.put(formattedParameterName, valueName);
                 } else {
@@ -996,27 +948,26 @@ public class Main {
                 }
                 break;
             case MQConstants.MQIA_SHAREABILITY:
-                if (parameter.getIntValue() == MQConstants.MQQA_SHAREABLE) {
+                if (parameterValue == MQConstants.MQQA_SHAREABLE) {
                     eventData.put(formattedParameterName, formatConstant("MQQA_SHAREABLE"));
                 } else {
                     eventData.put(formattedParameterName, formatConstant("MQQA_NOT_SHAREABLE"));
                 }
                 break;
             case MQConstants.MQIA_MEDIA_IMAGE_SCHEDULING:
-                filter = "MQMEDIMGSCHED_.*";
+                newFilter = () -> MQMEDIMGSCHED_STR(parameterValue);
                 break;
             case MQConstants.MQIA_MEDIA_IMAGE_INTERVAL:
             case MQConstants.MQIA_MEDIA_IMAGE_LOG_LENGTH:
-                eventData.put(formattedParameterName, parameter.getIntValue());
+                eventData.put(formattedParameterName, parameterValue);
                 break;
             case MQConstants.MQIA_MEDIA_IMAGE_RECOVER_OBJ:
             case MQConstants.MQIA_MEDIA_IMAGE_RECOVER_Q:
-                filter = "MQIMGRCOV_.*";
+                newFilter = () -> MQIMGRCOV_STR(parameterValue);
                 break;
             case MQConstants.MQIA_MAX_Q_FILE_SIZE:
-                parameterValue = parameter.getIntValue();
                 if (parameterValue == MQConstants.MQQFS_DEFAULT) {
-                    filter = "MQQFS_.*";
+                    newFilter = () -> MQQFS_STR(parameterValue);
                 } else {
                     eventData.put(formattedParameterName, parameterValue);
                 }
@@ -1024,68 +975,68 @@ public class Main {
 
             // MQIACF attributes
             case MQConstants.MQIACF_ACTION:
-                filter = "MQACT_.*";
+                newFilter = () -> MQACT_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_AUTH_REC_TYPE :
             case MQConstants.MQIACH_CHANNEL_INSTANCE_TYPE :
             case MQConstants.MQIACF_OBJECT_TYPE :
-                filter = "MQOT_.*";
+                newFilter = () -> MQOT_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_CF_SMDS_BLOCK_SIZE:
-                filter = "MQDSB_.*";
+                newFilter = () -> MQDSB_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_CF_SMDS_EXPAND:
-                filter = "MQUSAGE_EXPAND_.*";
+                newFilter = () -> MQUSAGE_EXPAND_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_CHLAUTH_TYPE:
-                filter = "MQCAUT_.*";
+                newFilter = () -> MQCAUT_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_COMMAND :
-                filter = "MQCMD_.*";
+                newFilter = () -> MQCMD_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_ENTITY_TYPE:
-                filter = "MQZAET_.*";
+                newFilter = () -> MQZAET_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_EVENT_ORIGIN :
-                filter = "MQEVO_.*";
+                newFilter = () -> MQEVO_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_OPERATION_ID:
-                filter = "MQXF_.*";
+                newFilter = () -> MQXF_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_OPERATION_TYPE:
-                filter = "MQOPER_.*";
+                newFilter = () -> MQOPER_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_MSG_TYPE:
-                filter = "MQMT_.*";
+                newFilter = () -> MQMT_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_Q_STATUS_TYPE :
-                valueName = lookupMultiMQConstant(parameter.getIntValue(), "MQIA");
+                valueName = lookupMultiMQConstant(parameterValue, "MQIA");
                 valueName = formatConstant(valueName);
                 eventData.put(formattedParameterName, valueName);
                 break;
             case MQConstants.MQIACF_REASON_QUALIFIER:
-                filter = "MQRQ_.*";
+                newFilter = () -> MQRQ_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_SECURITY_TYPE:
-                filter = "MQSECTYPE_.*";
+                newFilter = () -> MQSECTYPE_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_SECURITY_ITEM:
-                filter = "MQSECITEM_.*";
+                newFilter = () -> MQSECITEM_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_COMP_CODE:
-                valueName = MQConstants.lookupCompCode(parameter.getIntValue());
+                valueName = MQCC_STR(parameterValue);
                 valueName = formatConstant(valueName);
                 eventData.put(formattedParameterName, valueName);
                 break;
             case MQConstants.MQIACF_REASON_CODE:
-                valueName = MQConstants.lookupReasonCode(parameter.getIntValue());
+                valueName = MQRC_STR(parameterValue);
                 valueName = formatConstant(valueName);
                 eventData.put(formattedParameterName, valueName);
                 break;
             case MQConstants.MQIACF_ERROR_ID:
                 // Manual fix for the formatted lookup returning two values.
                 formattedParameterName = "errorId";
-                eventData.put(formattedParameterName, String.format("0x%08X", parameter.getIntValue()));
+                eventData.put(formattedParameterName, String.format("0x%08X", parameterValue));
                 break;
             case MQConstants.MQIACF_ENCODING:
             case MQConstants.MQIACF_CONNECT_OPTIONS:
@@ -1096,19 +1047,18 @@ public class Main {
                 // Note: The options should only show up if formatting activity trace messages
                 // This is not a formally supported function of this program.
                 // Nonetheless, we can at least format the data into hex and put it in the JSON.
-                eventData.put(formattedParameterName, String.format("0x%08X", parameter.getIntValue()));
+                eventData.put(formattedParameterName, String.format("0x%08X", parameterValue));
                 break;
             case MQConstants.MQIACF_LOG_REDUCTION:
-                filter = "MQLR_.*";
+                newFilter = () -> MQLR_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_IGNORE_STATE:
-                filter = "MQIS_.*";
+                newFilter = () -> MQIS_STR(parameterValue);
                 break;
 
             // MQIACH attributes
             case MQConstants.MQIACH_AMQP_KEEP_ALIVE:
             case MQConstants.MQIACH_KEEP_ALIVE_INTERVAL:
-                parameterValue = parameter.getIntValue();
                 if (parameterValue < 0) {
                     eventData.put(formattedParameterName, formatConstant("MQKAI_AUTO"));
                 } else {
@@ -1117,71 +1067,72 @@ public class Main {
                 break;
             case MQConstants.MQIACH_CHANNEL_DISP:
             case MQConstants.MQIACH_DEF_CHANNEL_DISP:
-                filter = "MQCHLD_.*";
+                newFilter = () -> MQCHLD_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_CHANNEL_TABLE :
-                filter = "MQCHTAB_.*";
+                newFilter = () -> MQCHTAB_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_CHANNEL_TYPE :
-                filter = "MQCHT_.*";
+                newFilter = () -> MQCHT_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_CONNECTION_AFFINITY:
-                filter = "MQCAFTY_.*";
+                newFilter = () -> MQCAFTY_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_DATA_CONVERSION:
-                filter = "MQCDC_.*";
+                newFilter = () -> MQCDC_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_DEF_RECONNECT:
-                filter = "MQRCN_.*";
+                newFilter = () -> MQRCN_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_MCA_TYPE:
-                filter = "MQMCAT_.*";
+                newFilter = () -> MQMCAT_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_MULTICAST_PROPERTIES:
-                filter = "MQMCP_.*";
+                newFilter = () -> MQMCP_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_NEW_SUBSCRIBER_HISTORY:
-                filter = "MQNSH_.*";
+                // filter = "MQNSH_.*";
+                newFilter = () -> MQNSH_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_NPM_SPEED:
-                filter = "MQNPMS_.*";
+                newFilter = () -> MQNPMS_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_PUT_AUTHORITY:
-                filter = "MQPA_.*";
+                newFilter = () -> MQPA_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_SSL_CLIENT_AUTH:
-                filter = "MQSCA_.*";
+                newFilter = () -> MQSCA_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_USE_CLIENT_ID:
-                filter = "MQUCI_.*";
+                newFilter = () -> MQUCI_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_USER_SOURCE:
-                filter = "MQUSRC_.*";
+                newFilter = () -> MQUSRC_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_WARNING:
-                filter = "MQWARN_.*";
+                newFilter = () -> MQWARN_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_XMIT_PROTOCOL_TYPE:
-                filter = "MQXPT_.*";
+                newFilter = () -> MQXPT_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_OPEN_OPTIONS:
-                optionsJSON = formatOptions(parameter.getIntValue(), openOptions);
+                optionsJSON = formatOptions(parameterValue, openOptions);
                 eventData.put(formattedParameterName, optionsJSON);
                 break;
             case MQConstants.MQIACF_CLOSE_OPTIONS:
-                optionsJSON = formatOptions(parameter.getIntValue(), closeOptions);
+                optionsJSON = formatOptions(parameterValue, closeOptions);
                 eventData.put(formattedParameterName, optionsJSON);
                 break;
             case MQConstants.MQIACF_SUB_OPTIONS:
-                optionsJSON = formatOptions(parameter.getIntValue(), subOptions);
+                optionsJSON = formatOptions(parameterValue, subOptions);
                 eventData.put(formattedParameterName, optionsJSON);
                 break;
             default:
-                eventData.put(formattedParameterName, parameter.getIntValue());
+                eventData.put(formattedParameterName, parameterValue);
         }
 
-        if (!filter.equals("")) {
-            valueName = MQConstants.lookup(parameter.getIntValue(), filter);
+        if (newFilter != null) {
+            valueName = newFilter.get();
             valueName = formatConstant(valueName);
             eventData.put(formattedParameterName, valueName);
         }

@@ -621,18 +621,13 @@ public class Main {
     }
 
     private void processCFIN(MQCFIN parameter, JSONObject eventData) throws JSONException {
-        String parameterName = parameter.getParameterName();
-
-        // Bugfix for IBM Parameter lookup having a conflict on
-        // MQIAMO and MQIA for the int value 2. No other parameter
-        // names present this issue, so we explicitly look for
-        // char set. The MQIA value comes from CMQC and the MQIAMO
-        // value comes from CMQCFC.
-        if (parameterName.contains("CODED_CHAR_SET")) {
-            parameterName = "MQIA_CODED_CHAR_SET_ID";
+        String parameterName = lookupMultiMQConstant(parameter.getParameter(), "MQIA");
+        String formattedParameterName;
+        if (parameterName != null) {
+            formattedParameterName = formatConstant(parameterName, true);
+        } else {
+            throw new IllegalArgumentException(String.format("Parameter name lookup for CFIN returned null! Integer value was: %d", parameter.getParameter()));
         }
-
-        String formattedParameterName = formatConstant(parameterName, true);
 
         final int parameterValue = parameter.getIntValue();
         String valueName;
@@ -677,25 +672,11 @@ public class Main {
             case MQConstants.MQIA_ADOPTNEWMCA_TYPE:
                 newFilter = () -> MQADOPT_TYPE_STR(parameterValue);
                 break;
-            case MQConstants.MQIA_APPL_TYPE :
-            case MQConstants.MQIACF_EVENT_APPL_TYPE :
-                // Manual handling for parameter name here because MQConstants.lookup() returns
-                // ambiguous results which are not applicable.
-                int parameterNameInt = parameter.getParameter();
-                parameterName = lookupMultiMQConstant(parameterNameInt, "MQIA");
-                // Handle potential null return from lookupMultiMQConstant().
-                if (parameterName == null) {
-                    throw new IllegalStateException(
-                            String.format("Parameter name for CFIN related constant is null! Integer value: %d",
-                                    parameterNameInt));
-                }
-                valueName = MQAT_STR(parameterValue);
-                formattedParameterName = formatConstant(parameterName, true);
-                valueName = formatConstant(valueName);
-
-                eventData.put(formattedParameterName, valueName);
+            case MQConstants.MQIA_APPL_TYPE:
+            case MQConstants.MQIACF_EVENT_APPL_TYPE:
+                newFilter = () -> MQAT_STR(parameterValue);
                 break;
-            case MQConstants.MQIA_AUTH_INFO_TYPE :
+            case MQConstants.MQIA_AUTH_INFO_TYPE:
                 newFilter = () -> MQAIT_STR(parameterValue);
                 break;
             case MQConstants.MQIA_AUTHENTICATION_METHOD:
@@ -1053,20 +1034,12 @@ public class Main {
                 newFilter = () -> MQSECITEM_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_COMP_CODE:
-                valueName = MQCC_STR(parameterValue);
-                valueName = formatConstant(valueName);
-                eventData.put(formattedParameterName, valueName);
+                newFilter = () -> MQCC_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_REASON_CODE:
-                valueName = MQRC_STR(parameterValue);
-                valueName = formatConstant(valueName);
-                eventData.put(formattedParameterName, valueName);
+                newFilter = () -> MQRC_STR(parameterValue);
                 break;
             case MQConstants.MQIACF_ERROR_ID:
-                // Manual fix for the formatted lookup returning two values.
-                formattedParameterName = "errorId";
-                eventData.put(formattedParameterName, String.format("0x%08X", parameterValue));
-                break;
             case MQConstants.MQIACF_ENCODING:
             case MQConstants.MQIACF_CONNECT_OPTIONS:
             case MQConstants.MQIACF_GET_OPTIONS:
@@ -1120,7 +1093,6 @@ public class Main {
                 newFilter = () -> MQMCP_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_NEW_SUBSCRIBER_HISTORY:
-                // filter = "MQNSH_.*";
                 newFilter = () -> MQNSH_STR(parameterValue);
                 break;
             case MQConstants.MQIACH_NPM_SPEED:

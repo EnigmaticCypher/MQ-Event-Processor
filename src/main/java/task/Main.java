@@ -37,6 +37,8 @@ public class Main {
     private static String INPUT_QUEUE_NAME;
     private static String OUTPUT_QUEUE_NAME;
     private static boolean DEBUG_MODE;
+    private static boolean OUTPUT_PERSISTENT;
+    private static boolean SYNCPOINT_ENABLED;
     private static volatile boolean SHUTDOWN = false;
     private static Logger logger = null;
 
@@ -154,6 +156,10 @@ public class Main {
         QMGR = config.getProperty("queue_manager");
         INPUT_QUEUE_NAME = config.getProperty("input_queue_name");
         OUTPUT_QUEUE_NAME = config.getProperty("output_queue_name");
+        OUTPUT_PERSISTENT = Boolean.parseBoolean(config.getProperty("output_message_persistent"));
+        SYNCPOINT_ENABLED = Boolean.parseBoolean(config.getProperty("syncpoint_enabled"));
+
+        inputFileStream.close();
     }
 
     private void startupDebugMode() throws JMSException, JSONException, IOException, MQDataException {

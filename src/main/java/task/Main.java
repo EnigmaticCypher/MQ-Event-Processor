@@ -6,6 +6,7 @@ import com.ibm.mq.MQMessage;
 import com.ibm.mq.constants.MQConstants;
 import com.ibm.mq.headers.MQDataException;
 import com.ibm.mq.headers.pcf.*;
+import com.ibm.mq.jms.MQConnection;
 import com.ibm.mq.jms.MQConnectionFactory;
 import com.ibm.mq.jms.MQDestination;
 import com.ibm.msg.client.jms.JmsConnectionFactory;
@@ -119,11 +120,7 @@ public class Main {
             readConfig();
             // TODO: Maybe make this application process messages in batches? This allows for more efficient MQCMIT
             // Which therefore means we should get better performance.
-            if (DEBUG_MODE) {
-                startupDebugMode();
-            } else {
-                startupProductionMode();
-            }
+            commonStartup();
         } catch (JMSException | IOException | MQDataException | JSONException exception) {
             List<String> exceptionMessages = new ArrayList<>();
             exceptionMessages.add(exception.getMessage());
@@ -162,14 +159,8 @@ public class Main {
         inputFileStream.close();
     }
 
-    private void startupDebugMode() throws JMSException, JSONException, IOException, MQDataException {
+    private void commonStartup() throws JSONException, JMSException, IOException, MQDataException {
         MQConnectionFactory connectionFactory = setupConnectionFactory();
-
-        long startTime = System.currentTimeMillis();
-        int counter = 0;
-
-        // TODO: Refactor the duplicate code here into a method maybe? Not quite sure how to go about this.
-        logger.info("System running in debug mode! Messages will not be destructively consumed from the input queue.");
         Connection connection = connectionFactory.createConnection();
         connection.start();
         logger.info("Created and started connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
@@ -182,6 +173,24 @@ public class Main {
         if (OUTPUT_PERSISTENT) {
             outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
         }
+
+        if (DEBUG_MODE) {
+            startupDebugMode(session, inputQueue, outputQueue);
+        } else {
+            startupProductionMode(session, inputQueue, outputQueue);
+        }
+
+        session.close();
+        logger.info("Successfully closed session to queue manager {}", QMGR);
+        connection.close();
+        logger.info("Successfully closed connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
+    }
+
+    private void startupDebugMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException, IOException, MQDataException {
+        long startTime = System.currentTimeMillis();
+        int counter = 0;
+        logger.info("System running in debug mode! Messages will not be destructively consumed from the input queue.");
+
         QueueBrowser browser = session.createBrowser((Queue) inputQueue);
         logger.info("Created browser to queue {}", INPUT_QUEUE_NAME);
         Enumeration<Message> messages = (Enumeration<Message>) browser.getEnumeration();
@@ -217,32 +226,13 @@ public class Main {
         logger.info("Successfully closed browser to queue {}", INPUT_QUEUE_NAME);
         producer.close();
         logger.info("Successfully closed producer to queue {}", OUTPUT_QUEUE_NAME);
-        session.close();
-        logger.info("Successfully closed session to queue manager {}", QMGR);
-        connection.close();
-        logger.info("Successfully closed connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
         logger.info("We processed {} messages in {} milliseconds", counter, totalTime);
     }
 
-    private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {
-        MQConnectionFactory connectionFactory = setupConnectionFactory();
-        Connection connection = connectionFactory.createConnection();
-        connection.start();
-        logger.info("Created and started connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
-
-        Session session = connection.createSession(SYNCPOINT_ENABLED, Session.AUTO_ACKNOWLEDGE);
-        MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
-        inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
-        inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);
-        MQDestination outputQueue = (MQDestination) session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
-        outputQueue.setMessageBodyStyle(WMQConstants.WMQ_MESSAGE_BODY_MQ);
-        if (OUTPUT_PERSISTENT) {
-            outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
-        }
-
+    private void startupProductionMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException, IOException, MQDataException {
         MessageProducer producer = session.createProducer(outputQueue);
         logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);
         MessageConsumer consumer = session.createConsumer(inputQueue);
@@ -280,10 +270,6 @@ public class Main {
         logger.info("Successfully closed producer to queue {}", OUTPUT_QUEUE_NAME);
         consumer.close();
         logger.info("Successfully closed consumer to queue {}", INPUT_QUEUE_NAME);
-        session.close();
-        logger.info("Successfully closed session to queue manager {}", QMGR);
-        connection.close();
-        logger.info("Successfully closed connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
     }
 
     private MQConnectionFactory setupConnectionFactory() throws JMSException {

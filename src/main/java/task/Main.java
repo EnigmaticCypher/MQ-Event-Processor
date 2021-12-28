@@ -6,6 +6,7 @@ import com.ibm.mq.MQMessage;
 import com.ibm.mq.constants.MQConstants;
 import com.ibm.mq.headers.MQDataException;
 import com.ibm.mq.headers.pcf.*;
+import com.ibm.mq.jms.MQConnectionFactory;
 import com.ibm.mq.jms.MQDestination;
 import com.ibm.msg.client.jms.JmsConnectionFactory;
 import com.ibm.msg.client.jms.JmsFactoryFactory;
@@ -30,8 +31,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class Main {
-    private static String HOST;
-    private static int PORT;
+    private static String CONNECTION_LIST;
     private static String CHANNEL;
     private static String QMGR;
     private static String INPUT_QUEUE_NAME;
@@ -149,8 +149,7 @@ public class Main {
         config.load(inputFileStream);
 
         DEBUG = Boolean.parseBoolean(config.getProperty("debug"));
-        HOST = config.getProperty("hostname");
-        PORT = Integer.parseInt(config.getProperty("port"));
+        CONNECTION_LIST = config.getProperty("connection_list");
         CHANNEL = config.getProperty("channel");
         QMGR = config.getProperty("queue_manager");
         INPUT_QUEUE_NAME = config.getProperty("input_queue_name");
@@ -158,7 +157,7 @@ public class Main {
     }
 
     private void startupDebugMode() throws JMSException, JSONException, IOException, MQDataException {
-        JmsConnectionFactory connectionFactory = setupConnectionFactory();
+        MQConnectionFactory connectionFactory = setupConnectionFactory();
 
         long startTime = System.currentTimeMillis();
         int counter = 0;
@@ -167,7 +166,7 @@ public class Main {
         logger.info("System running in debug mode! Messages will not be destructively consumed from the input queue.");
         Connection connection = connectionFactory.createConnection();
         connection.start();
-        logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
+        logger.info("Created and started connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
         Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
         MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
@@ -213,7 +212,7 @@ public class Main {
         session.close();
         logger.info("Successfully closed session to queue manager {}", QMGR);
         connection.close();
-        logger.info("Successfully closed connection to queue manager {} on {}({})", QMGR, HOST, PORT);
+        logger.info("Successfully closed connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
@@ -223,10 +222,10 @@ public class Main {
     private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {
         // TODO: Make transacted a config option. Users may not want syncpoint enabled if they want to use this
         // with non-persistent event messages.
-        JmsConnectionFactory connectionFactory = setupConnectionFactory();
+        MQConnectionFactory connectionFactory = setupConnectionFactory();
         Connection connection = connectionFactory.createConnection();
         connection.start();
-        logger.info("Created and started connection to queue manager {} on {}({})", QMGR, HOST, PORT);
+        logger.info("Created and started connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
 
         Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
         MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
@@ -276,21 +275,21 @@ public class Main {
         session.close();
         logger.info("Successfully closed session to queue manager {}", QMGR);
         connection.close();
-        logger.info("Successfully closed connection to queue manager {} on {}({})", QMGR, HOST, PORT);
+        logger.info("Successfully closed connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
     }
 
-    private JmsConnectionFactory setupConnectionFactory() throws JMSException {
-        JmsFactoryFactory ff = JmsFactoryFactory.getInstance(WMQConstants.WMQ_PROVIDER);
-        JmsConnectionFactory cf = ff.createConnectionFactory();
+    private MQConnectionFactory setupConnectionFactory() throws JMSException {
+        JmsFactoryFactory jmsFactoryFactory = JmsFactoryFactory.getInstance(WMQConstants.WMQ_PROVIDER);
+        JmsConnectionFactory jmsConnectionFactory = jmsFactoryFactory.createConnectionFactory();
+        MQConnectionFactory mqConnectionFactory = (MQConnectionFactory) jmsConnectionFactory;
 
-        cf.setStringProperty(WMQConstants.WMQ_HOST_NAME, HOST);
-        cf.setIntProperty(WMQConstants.WMQ_PORT, PORT);
-        cf.setStringProperty(WMQConstants.WMQ_CHANNEL, CHANNEL);
-        cf.setIntProperty(WMQConstants.WMQ_CONNECTION_MODE, WMQConstants.WMQ_CM_CLIENT);
-        cf.setStringProperty(WMQConstants.WMQ_QUEUE_MANAGER, QMGR);
-        cf.setStringProperty(WMQConstants.WMQ_APPLICATIONNAME, "Event Consumer");
+        mqConnectionFactory.setConnectionNameList(CONNECTION_LIST);
+        mqConnectionFactory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
+        mqConnectionFactory.setChannel(CHANNEL);
+        mqConnectionFactory.setQueueManager(QMGR);
+        mqConnectionFactory.setAppName("Event Consumer");
 
-        return cf;
+        return mqConnectionFactory;
     }
 
     private JSONObject processMessage(Message receivedMessage) throws IOException, MQDataException, JSONException, JMSException {

@@ -173,7 +173,7 @@ public class Main {
         Connection connection = connectionFactory.createConnection();
         connection.start();
         logger.info("Created and started connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
-        Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+        Session session = connection.createSession(SYNCPOINT_ENABLED, Session.AUTO_ACKNOWLEDGE);
         MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
         inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);
@@ -226,14 +226,12 @@ public class Main {
     }
 
     private void startupProductionMode() throws JMSException, JSONException, IOException, MQDataException {
-        // TODO: Make transacted a config option. Users may not want syncpoint enabled if they want to use this
-        // with non-persistent event messages.
         MQConnectionFactory connectionFactory = setupConnectionFactory();
         Connection connection = connectionFactory.createConnection();
         connection.start();
         logger.info("Created and started connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
 
-        Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+        Session session = connection.createSession(SYNCPOINT_ENABLED, Session.AUTO_ACKNOWLEDGE);
         MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
         inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);

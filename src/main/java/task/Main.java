@@ -6,7 +6,6 @@ import com.ibm.mq.MQMessage;
 import com.ibm.mq.constants.MQConstants;
 import com.ibm.mq.headers.MQDataException;
 import com.ibm.mq.headers.pcf.*;
-import com.ibm.mq.jms.MQConnection;
 import com.ibm.mq.jms.MQConnectionFactory;
 import com.ibm.mq.jms.MQDestination;
 import com.ibm.msg.client.jms.JmsConnectionFactory;

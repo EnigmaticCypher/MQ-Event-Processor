@@ -179,7 +179,9 @@ public class Main {
         inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);
         MQDestination outputQueue = (MQDestination) session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
         outputQueue.setMessageBodyStyle(WMQConstants.WMQ_MESSAGE_BODY_MQ);
-        outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
+        if (OUTPUT_PERSISTENT) {
+            outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
+        }
         QueueBrowser browser = session.createBrowser((Queue) inputQueue);
         logger.info("Created browser to queue {}", INPUT_QUEUE_NAME);
         Enumeration<Message> messages = (Enumeration<Message>) browser.getEnumeration();
@@ -237,7 +239,9 @@ public class Main {
         inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);
         MQDestination outputQueue = (MQDestination) session.createQueue("queue:///" + OUTPUT_QUEUE_NAME);
         outputQueue.setMessageBodyStyle(WMQConstants.WMQ_MESSAGE_BODY_MQ);
-        outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
+        if (OUTPUT_PERSISTENT) {
+            outputQueue.setPersistence(WMQConstants.DELIVERY_PERSISTENT);
+        }
 
         MessageProducer producer = session.createProducer(outputQueue);
         logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);

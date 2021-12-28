@@ -36,7 +36,7 @@ public class Main {
     private static String QMGR;
     private static String INPUT_QUEUE_NAME;
     private static String OUTPUT_QUEUE_NAME;
-    private static boolean DEBUG;
+    private static boolean DEBUG_MODE;
     private static volatile boolean SHUTDOWN = false;
     private static Logger logger = null;
 
@@ -117,7 +117,7 @@ public class Main {
             readConfig();
             // TODO: Maybe make this application process messages in batches? This allows for more efficient MQCMIT
             // Which therefore means we should get better performance.
-            if (DEBUG) {
+            if (DEBUG_MODE) {
                 startupDebugMode();
             } else {
                 startupProductionMode();
@@ -148,7 +148,7 @@ public class Main {
         FileInputStream inputFileStream = new FileInputStream(fileName);
         config.load(inputFileStream);
 
-        DEBUG = Boolean.parseBoolean(config.getProperty("debug"));
+        DEBUG_MODE = Boolean.parseBoolean(config.getProperty("debug_mode"));
         CONNECTION_LIST = config.getProperty("connection_list");
         CHANNEL = config.getProperty("channel");
         QMGR = config.getProperty("queue_manager");

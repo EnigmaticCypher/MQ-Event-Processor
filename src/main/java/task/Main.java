@@ -33,7 +33,6 @@ import org.apache.logging.log4j.Logger;
 public class Main {
     private static String CONNECTION_LIST;
     private static String CHANNEL;
-    private static String QMGR;
     private static String INPUT_QUEUE_NAME;
     private static String OUTPUT_QUEUE_NAME;
     private static boolean DEBUG_MODE;
@@ -149,7 +148,6 @@ public class Main {
         DEBUG_MODE = Boolean.parseBoolean(config.getProperty("debug_mode"));
         CONNECTION_LIST = config.getProperty("connection_list");
         CHANNEL = config.getProperty("channel");
-        QMGR = config.getProperty("queue_manager");
         INPUT_QUEUE_NAME = config.getProperty("input_queue_name");
         OUTPUT_QUEUE_NAME = config.getProperty("output_queue_name");
         OUTPUT_PERSISTENT = Boolean.parseBoolean(config.getProperty("output_message_persistent"));
@@ -162,7 +160,7 @@ public class Main {
         MQConnectionFactory connectionFactory = setupConnectionFactory();
         Connection connection = connectionFactory.createConnection();
         connection.start();
-        logger.info("Created and started connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
+        logger.info("Created and started connection to queue manager on {}", CONNECTION_LIST);
         Session session = connection.createSession(SYNCPOINT_ENABLED, Session.AUTO_ACKNOWLEDGE);
         MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
@@ -180,9 +178,9 @@ public class Main {
         }
 
         session.close();
-        logger.info("Successfully closed session to queue manager {}", QMGR);
+        logger.info("Successfully closed session to queue manager");
         connection.close();
-        logger.info("Successfully closed connection to queue manager {} on {}", QMGR, CONNECTION_LIST);
+        logger.info("Successfully closed connection to queue manager on {}", CONNECTION_LIST);
     }
 
     private void startupDebugMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException, IOException, MQDataException {
@@ -279,7 +277,6 @@ public class Main {
         mqConnectionFactory.setConnectionNameList(CONNECTION_LIST);
         mqConnectionFactory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
         mqConnectionFactory.setChannel(CHANNEL);
-        mqConnectionFactory.setQueueManager(QMGR);
         mqConnectionFactory.setAppName("Event Consumer");
 
         return mqConnectionFactory;

@@ -958,6 +958,10 @@ public class Main {
                 break;
             case MQConstants.MQIA_MEDIA_IMAGE_INTERVAL:
             case MQConstants.MQIA_MEDIA_IMAGE_LOG_LENGTH:
+                // We intentionally want this here. Even though it does the same as the default,
+                // it is far preferable to actually explicitly cover every constant. Therefore,
+                // this warning is being suppressed.
+                //noinspection DuplicateBranchesInSwitch
                 eventData.put(formattedParameterName, parameterValue);
                 break;
             case MQConstants.MQIA_MEDIA_IMAGE_RECOVER_OBJ:

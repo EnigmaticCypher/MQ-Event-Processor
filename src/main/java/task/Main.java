@@ -211,13 +211,21 @@ public class Main {
             producer.send(outputMessage);
             counter += 1;
 
-            if (counter % 100 == 0) {
-                session.commit();
-                logger.debug("Committed current transaction");
+            // TODO: Need to add support for the configurable commit size into this.
+            // TODO: Also need to look at moving all connection / QM objects into class level vars
+            // This simplifies the error handling significantly as they'll be accessible by all
+            // class functions.
+            if (SYNCPOINT_ENABLED) {
+                if (counter % 100 == 0) {
+                    session.commit();
+                    logger.debug("Committed current transaction");
+                }
             }
         }
         // Commit remaining batch before shutting down.
-        session.commit();
+        if (SYNCPOINT_ENABLED) {
+            session.commit();
+        }
 
         browser.close();
         logger.info("Successfully closed browser to queue {}", INPUT_QUEUE_NAME);
@@ -258,7 +266,9 @@ public class Main {
             // We commit for every message at the moment, less performant but there are plans to add the
             // capability to handle batching. Needs to be configurable by the user, because the amount of
             // load will determine the need for batched commits or not.
-            session.commit();
+            if (SYNCPOINT_ENABLED) {
+                session.commit();
+            }
             logger.debug("Committed current transaction");
             logger.info("Completed processing for current message.");
         }

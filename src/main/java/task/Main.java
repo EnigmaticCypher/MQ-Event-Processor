@@ -119,7 +119,7 @@ public class Main {
             // TODO: Maybe make this application process messages in batches? This allows for more efficient MQCMIT
             // Which therefore means we should get better performance.
             commonStartup();
-        } catch (JMSException | IOException | MQDataException | JSONException exception) {
+        } catch (JMSException | JSONException exception) {
             List<String> exceptionMessages = new ArrayList<>();
             exceptionMessages.add(exception.getMessage());
             Throwable exceptionCause = exception.getCause();
@@ -138,12 +138,16 @@ public class Main {
         logger = LogManager.getLogger();
     }
 
-    private static void readConfig() throws IOException {
+    private static void readConfig() {
         Properties config = new Properties();
         String fileName = "config/app.properties";
 
-        FileInputStream inputFileStream = new FileInputStream(fileName);
-        config.load(inputFileStream);
+        // Making use of the Java try-with-resources statement to simplify handling.
+        try (FileInputStream inputFileStream = new FileInputStream(fileName)) {
+            config.load(inputFileStream);
+        } catch (IOException exception) {
+            logger.fatal(exception);
+        }
 
         DEBUG_MODE = Boolean.parseBoolean(config.getProperty("debug_mode"));
         CONNECTION_LIST = config.getProperty("connection_list");
@@ -152,11 +156,9 @@ public class Main {
         OUTPUT_QUEUE_NAME = config.getProperty("output_queue_name");
         OUTPUT_PERSISTENT = Boolean.parseBoolean(config.getProperty("output_message_persistent"));
         SYNCPOINT_ENABLED = Boolean.parseBoolean(config.getProperty("syncpoint_enabled"));
-
-        inputFileStream.close();
     }
 
-    private void commonStartup() throws JSONException, JMSException, IOException, MQDataException {
+    private void commonStartup() throws JSONException, JMSException {
         MQConnectionFactory connectionFactory = setupConnectionFactory();
         Connection connection = connectionFactory.createConnection();
         connection.start();
@@ -183,7 +185,7 @@ public class Main {
         logger.info("Successfully closed connection to queue manager on {}", CONNECTION_LIST);
     }
 
-    private void startupDebugMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException, IOException, MQDataException {
+    private void startupDebugMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException {
         long startTime = System.currentTimeMillis();
         int counter = 0;
         logger.info("System running in debug mode! Messages will not be destructively consumed from the input queue.");
@@ -237,7 +239,7 @@ public class Main {
         logger.info("We processed {} messages in {} milliseconds", counter, totalTime);
     }
 
-    private void startupProductionMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException, IOException, MQDataException {
+    private void startupProductionMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException {
         MessageProducer producer = session.createProducer(outputQueue);
         logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);
         MessageConsumer consumer = session.createConsumer(inputQueue);
@@ -292,15 +294,29 @@ public class Main {
         return mqConnectionFactory;
     }
 
-    private JSONObject processMessage(Message receivedMessage) throws IOException, MQDataException, JSONException, JMSException {
-        MQMessage mqMessage = convertToMQMessage(receivedMessage);
+    private JSONObject processMessage(Message receivedMessage) throws JSONException, JMSException {
+        MQMessage mqMessage;
+        try {
+            mqMessage = convertToMQMessage(receivedMessage);
+        } catch (JMSException | IOException exception) {
+            logger.error("Could not convert received bytes to MQ Message!");
+            return null;
+        }
 
         if (!checkMessageSanity(mqMessage)) {
             logger.error("Message failed basic sanity checks!");
             return null;
         }
 
-        PCFMessage pcfMessage = new PCFMessage(mqMessage);
+        PCFMessage pcfMessage;
+        try {
+            pcfMessage = new PCFMessage(mqMessage);
+        } catch (IOException | MQDataException exception) {
+            logger.error(exception);
+            logger.error("Failed to create PCF Message from MQ Message. Most likely reason is a problem related to the PCF headers.");
+            return null;
+        }
+
         MQCFH pcfHeader = pcfMessage.getHeader();
 
         JSONObject jsonMessage = new JSONObject();
@@ -385,6 +401,10 @@ public class Main {
     }
 
     private boolean checkMessageSanity(MQMessage mqMessage) {
+        if (mqMessage == null) {
+            return false;
+        }
+
         switch (mqMessage.format) {
             case MQConstants.MQFMT_EVENT:
             case MQConstants.MQFMT_PCF:

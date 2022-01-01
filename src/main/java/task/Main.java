@@ -119,8 +119,8 @@ public class Main {
     public Main() {}
 
     private void initialise() {
+        readConfig();
         try {
-            readConfig();
             // TODO: Maybe make this application process messages in batches? This allows for more efficient MQCMIT
             // Which therefore means we should get better performance.
             commonStartup();

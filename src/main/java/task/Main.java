@@ -31,6 +31,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class Main {
+    // Constants from config file.
     private static String CONNECTION_LIST;
     private static String CHANNEL;
     private static String INPUT_QUEUE_NAME;
@@ -40,6 +41,10 @@ public class Main {
     private static boolean SYNCPOINT_ENABLED;
     private static volatile boolean SHUTDOWN = false;
     private static Logger logger = null;
+
+    // Objects related to connection to queue manager
+    Connection connection;
+    Session session;
 
     private static final Map<Integer, String> openOptions = new LinkedHashMap<>() {{
         put(MQConstants.MQOO_ALTERNATE_USER_AUTHORITY, "altusr");
@@ -160,10 +165,11 @@ public class Main {
 
     private void commonStartup() throws JSONException, JMSException {
         MQConnectionFactory connectionFactory = setupConnectionFactory();
-        Connection connection = connectionFactory.createConnection();
+        // Is the keyword `this` needed here? Don't know... if there's any weird "state" issues, check here.
+        connection = connectionFactory.createConnection();
         connection.start();
         logger.info("Created and started connection to queue manager on {}", CONNECTION_LIST);
-        Session session = connection.createSession(SYNCPOINT_ENABLED, Session.AUTO_ACKNOWLEDGE);
+        session = connection.createSession(SYNCPOINT_ENABLED, Session.AUTO_ACKNOWLEDGE);
         MQDestination inputQueue = (MQDestination) session.createQueue("queue:///" + INPUT_QUEUE_NAME);
         inputQueue.setReceiveConversion(WMQConstants.WMQ_RECEIVE_CONVERSION_QMGR);
         inputQueue.setReceiveCCSID(WMQConstants.CCSID_UTF8);
@@ -174,9 +180,9 @@ public class Main {
         }
 
         if (DEBUG_MODE) {
-            startupDebugMode(session, inputQueue, outputQueue);
+            startupDebugMode(inputQueue, outputQueue);
         } else {
-            startupProductionMode(session, inputQueue, outputQueue);
+            startupProductionMode(inputQueue, outputQueue);
         }
 
         session.close();
@@ -185,7 +191,7 @@ public class Main {
         logger.info("Successfully closed connection to queue manager on {}", CONNECTION_LIST);
     }
 
-    private void startupDebugMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException {
+    private void startupDebugMode(MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException {
         long startTime = System.currentTimeMillis();
         int counter = 0;
         logger.info("System running in debug mode! Messages will not be destructively consumed from the input queue.");
@@ -239,7 +245,7 @@ public class Main {
         logger.info("We processed {} messages in {} milliseconds", counter, totalTime);
     }
 
-    private void startupProductionMode(Session session, MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException {
+    private void startupProductionMode(MQDestination inputQueue, MQDestination outputQueue) throws JMSException, JSONException {
         MessageProducer producer = session.createProducer(outputQueue);
         logger.info("Created producer to queue {}", OUTPUT_QUEUE_NAME);
         MessageConsumer consumer = session.createConsumer(inputQueue);

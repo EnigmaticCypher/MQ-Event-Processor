@@ -39,6 +39,7 @@ public class Main {
     private static boolean DEBUG_MODE;
     private static boolean OUTPUT_PERSISTENT;
     private static boolean SYNCPOINT_ENABLED;
+    private static int UOW_BATCH_SIZE;
     private static volatile boolean SHUTDOWN = false;
     private static Logger logger = null;
 
@@ -161,6 +162,7 @@ public class Main {
         OUTPUT_QUEUE_NAME = config.getProperty("output_queue_name");
         OUTPUT_PERSISTENT = Boolean.parseBoolean(config.getProperty("output_message_persistent"));
         SYNCPOINT_ENABLED = Boolean.parseBoolean(config.getProperty("syncpoint_enabled"));
+        UOW_BATCH_SIZE = Integer.parseInt(config.getProperty("uow_batch_size"));
     }
 
     private void commonStartup() throws JSONException, JMSException {
@@ -219,12 +221,11 @@ public class Main {
             producer.send(outputMessage);
             counter += 1;
 
-            // TODO: Need to add support for the configurable commit size into this.
             // TODO: Also need to look at moving all connection / QM objects into class level vars
             // This simplifies the error handling significantly as they'll be accessible by all
             // class functions.
             if (SYNCPOINT_ENABLED) {
-                if (counter % 100 == 0) {
+                if (counter % UOW_BATCH_SIZE == 0) {
                     session.commit();
                     logger.debug("Committed current transaction");
                 }
@@ -252,6 +253,8 @@ public class Main {
         logger.info("Created consumer to queue {}", INPUT_QUEUE_NAME);
 
         logger.info("Beginning message processing...");
+
+        int counter = 0;
         while (!SHUTDOWN) {
             Message message = consumer.receive();
             logger.debug("Received new message, started new transaction");
@@ -271,14 +274,14 @@ public class Main {
 
             TextMessage outputMessage = session.createTextMessage(jsonMessage.toString());
             producer.send(outputMessage);
-            // We commit for every message at the moment, less performant but there are plans to add the
-            // capability to handle batching. Needs to be configurable by the user, because the amount of
-            // load will determine the need for batched commits or not.
+            counter += 1;
+
             if (SYNCPOINT_ENABLED) {
-                session.commit();
+                if (counter % UOW_BATCH_SIZE == 0) {
+                    session.commit();
+                    logger.debug("Committed current transaction");
+                }
             }
-            logger.debug("Committed current transaction");
-            logger.info("Completed processing for current message.");
         }
 
         producer.close();

@@ -283,6 +283,10 @@ public class Main {
                 }
             }
         }
+        // Commit remaining batch before shutting down.
+        if (SYNCPOINT_ENABLED) {
+            session.commit();
+        }
 
         producer.close();
         logger.info("Successfully closed producer to queue {}", OUTPUT_QUEUE_NAME);

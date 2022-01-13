@@ -2,7 +2,7 @@ plugins {
     id 'application'
 }
 
-version '0.7-BETA'
+version '0.71-BETA'
 
 repositories {
     mavenCentral()
